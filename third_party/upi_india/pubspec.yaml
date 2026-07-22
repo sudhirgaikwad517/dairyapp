@@ -1,0 +1,19 @@
+name: upi_india
+description: Local Android-Gradle-compatible copy of upi_india 3.0.1.
+version: 3.0.1+local
+publish_to: none
+
+environment:
+  sdk: '>=2.12.0 <4.0.0'
+  flutter: '>=1.20.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.az.upi_india
+        pluginClass: UpiIndiaPlugin

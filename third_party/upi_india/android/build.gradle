@@ -1,0 +1,13 @@
+group 'com.az.upi_india'
+version '1.0'
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.az.upi_india'
+    compileSdkVersion flutter.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion 16
+    }
+}
