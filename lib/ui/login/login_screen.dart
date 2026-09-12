@@ -10,6 +10,7 @@ import 'package:dairy_app/ui/utils/widgets/common_text.dart';
 import 'package:dairy_app/ui/utils/widgets/common_text_form_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dairy_app/framework/provider/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +22,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
 
   final GlobalKey _loginButtonKey = GlobalKey();
+  final TextEditingController _phoneController = TextEditingController();
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +117,7 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
 
                       /// Mobile Number Input
                       CommonTextFormField(
+                        controller: _phoneController,
                         keyboardType: TextInputType.phone,
                         hintText: "9876543210",
                         prefixIcon: SizedBox(
@@ -155,26 +164,59 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 32),
 
                       /// Login Button
-                      CommonButton(
-                        onTap: () {
-                          Navigator.of(context).push(MaterialPageRoute(builder: (context)=> OtpVerificationScreen()));
-                        },
-                        key: _loginButtonKey,
-                        buttonText: AppConstants.strLogin,
-                        height: 58,
-                        width: double.infinity,
-                        borderRadius: BorderRadius.circular(18),
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.clr6156F1,
-                            AppColors.clr6B60FE,
-                          ],
-                        ),
-                        buttonTextStyle: TextStyles.bold.copyWith(
-                          fontSize: 18,
-                          color: AppColors.clrWhiteFFFFFF,
-                        ),
-                      ),
+                      Consumer(builder: (context, ref, child) {
+                        final authState = ref.watch(authNotifierProvider);
+                        return CommonButton(
+                          onTap: authState.isLoading ? () {} : () async {
+                            if (_phoneController.text.length < 10) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text("Enter a valid 10-digit number"),
+                                  behavior: SnackBarBehavior.floating,
+                                  margin: EdgeInsets.only(
+                                    bottom: MediaQuery.of(context).size.height - 150,
+                                    left: 20,
+                                    right: 20,
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            final success = await ref.read(authNotifierProvider.notifier).sendOtp(_phoneController.text);
+                            if (success && mounted) {
+                              Navigator.of(context).push(MaterialPageRoute(builder: (context)=> OtpVerificationScreen()));
+                            } else if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(ref.read(authNotifierProvider).error ?? "Failed to send OTP"),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: Colors.redAccent,
+                                  margin: EdgeInsets.only(
+                                    bottom: MediaQuery.of(context).size.height - 150,
+                                    left: 20,
+                                    right: 20,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          key: _loginButtonKey,
+                          buttonText: authState.isLoading ? "Please wait..." : AppConstants.strLogin,
+                          height: 58,
+                          width: double.infinity,
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.clr6156F1,
+                              AppColors.clr6B60FE,
+                            ],
+                          ),
+                          buttonTextStyle: TextStyles.bold.copyWith(
+                            fontSize: 18,
+                            color: AppColors.clrWhiteFFFFFF,
+                          ),
+                        );
+                      }),
 
                     ],
                   ),

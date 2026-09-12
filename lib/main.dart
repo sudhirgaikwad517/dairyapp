@@ -2,7 +2,11 @@ import 'package:dairy_app/ui/splash/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
+import 'package:dairy_app/framework/dependency_injection/inject.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await configureDependencies();
   runApp(ProviderScope(child: const MyApp()));
 }
 

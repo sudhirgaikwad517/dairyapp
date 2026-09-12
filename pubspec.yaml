@@ -49,6 +49,8 @@ dependencies:
   # declare a namespace, which current Android Gradle Plugin versions require.
   upi_india:
     path: third_party/upi_india
+  carousel_slider: ^5.1.2
+  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:

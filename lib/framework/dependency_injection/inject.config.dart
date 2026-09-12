@@ -19,6 +19,10 @@ import 'package:dairy_app/framework/provider/network/dio/dio_client.dart'
     as _i656;
 import 'package:dairy_app/framework/provider/network/dio/dio_interceptors.dart'
     as _i726;
+import 'package:dairy_app/framework/repository/auth/auth_repository.dart'
+    as _i1057;
+import 'package:dairy_app/framework/repository/product/product_repository.dart'
+    as _i37;
 import 'package:dio/dio.dart' as _i361;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
@@ -38,6 +42,12 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i726.DioInterceptors(gh<_i216.HiveClient>()),
     );
     gh.lazySingleton<_i656.DioClient>(() => _i656.DioClient(gh<_i361.Dio>()));
+    gh.factory<_i1057.AuthRepository>(
+      () => _i1057.AuthRepository(gh<_i361.Dio>()),
+    );
+    gh.factory<_i37.ProductRepository>(
+      () => _i37.ProductRepository(gh<_i361.Dio>()),
+    );
     return this;
   }
 }

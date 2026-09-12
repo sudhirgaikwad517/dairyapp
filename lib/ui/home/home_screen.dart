@@ -1,6 +1,5 @@
 import 'package:dairy_app/framework/controller/address/address_controller.dart';
 import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
-import 'package:dairy_app/framework/repository/cart/catalog_data.dart';
 import 'package:dairy_app/ui/address/address_screen.dart';
 import 'package:dairy_app/ui/best_sellers/best_sellers_screen.dart';
 import 'package:dairy_app/ui/menu/menu_screen.dart';
@@ -15,6 +14,11 @@ import 'package:dairy_app/ui/utils/widgets/common_text.dart';
 import 'package:dairy_app/ui/wallet/wallet_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:video_player/video_player.dart';
+import 'package:dairy_app/framework/provider/banner/banner_provider.dart';
+import 'package:dairy_app/framework/provider/catalog/catalog_provider.dart';
+import 'package:dairy_app/framework/repository/cart/product_model.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -25,40 +29,85 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(catalogNotifierProvider.notifier).fetchCatalog();
+      ref.read(bannerNotifierProvider.notifier).fetchBanners();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final watchAddress = ref.watch(addressProvider);
     final selectedAddress = watchAddress.selectedAddress;
+    final catalogState = ref.watch(catalogNotifierProvider);
 
     return Scaffold(
       backgroundColor: AppColors.clrF7F7F7,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              /// Top Bar with Address
-              _buildTopBar(selectedAddress?.address ?? "Select Address"),
+        child: Column(
+          children: [
+            /// Top Bar with Address (Static)
+            _buildTopBar(selectedAddress?.address ?? "Select Address"),
+            
+            /// Scrollable Content
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// First Banner (Carousel)
+                    _buildBanner(),
 
-              /// Banner
-              _buildBanner(),
+                    const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
+                    /// Categories
+                    _buildSectionHeader(title : "Categories", navTitle: ''),
+                    const SizedBox(height: 16),
+                    _buildCategoriesList(),
 
-              /// Categories
-              _buildSectionHeader(title : "Categories", navTitle: ''),
-              const SizedBox(height: 16),
-              _buildCategoriesList(),
+                    const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
+                    /// Best Sellers
+                    _buildSectionHeader(title: "Best Sellers", navTitle: "View All"),
+                    const SizedBox(height: 16),
+                    _buildHorizontalProductList(
+                      catalogState.products.where((p) => p.isPopular).toList(),
+                      catalogState.isLoading,
+                    ),
 
-              /// Best Sellers
-              _buildSectionHeader(title: "Best Sellers", navTitle: "View All"),
-              const SizedBox(height: 16),
-              _buildBestSellersList(),
+                    const SizedBox(height: 24),
 
-              const SizedBox(height: 30),
-            ],
-          ),
+                    /// Second Banner (Video)
+                    _buildDarkBanner(ref.watch(bannerNotifierProvider)),
+
+                    const SizedBox(height: 24),
+
+                    /// New Arrivals
+                    _buildSectionHeader(title: "New Arrivals", navTitle: "View All"),
+                    const SizedBox(height: 16),
+                    _buildHorizontalProductList(
+                      catalogState.products.where((p) => p.isNewArrival).toList(),
+                      catalogState.isLoading,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    /// Seasonal Products
+                    _buildSectionHeader(title: "Seasonal Products", navTitle: "View All"),
+                    const SizedBox(height: 16),
+                    _buildHorizontalProductList(
+                      catalogState.products.where((p) => p.isSeasonal).toList(),
+                      catalogState.isLoading,
+                    ),
+
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -169,63 +218,90 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildBanner() {
+    final bannerState = ref.watch(bannerNotifierProvider);
+
+    if (bannerState.isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          height: 180,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    // if (bannerState.error != null) {
+    //   return const Padding(
+    //     padding: EdgeInsets.symmetric(horizontal: 16.0),
+    //     child: SizedBox(
+    //       height: 180,
+    //       child: Center(child: Text("Failed to load banners")),
+    //     ),
+    //   );
+    // }
+
+    final topBanners = bannerState.topBanners;
+
+    if (topBanners.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          height: 180,
+          child: Center(child: Text("No banners found")),
+        ),
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.defaultPadding,
-      ),
-      child: CommonContainer(
-        height: 180,
-        width: double.infinity,
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [AppColors.clr6156F1, AppColors.clr6B60FE],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.defaultPadding),
+      child: CarouselSlider(
+        options: CarouselOptions(
+          height: 180.0,
+          autoPlay: true,
+          enlargeCenterPage: false,
+          viewportFraction: 1.0,
+          aspectRatio: 16 / 9,
+          autoPlayCurve: Curves.fastOutSlowIn,
+          enableInfiniteScroll: true,
+          autoPlayAnimationDuration: const Duration(milliseconds: 800),
         ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CommonText(
-              data: "Subscribe once & Get",
-              style: TextStyles.medium.copyWith(
-                color: AppColors.clrWhiteFFFFFF,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 4),
-            CommonText(
-              data: "FREE",
-              style: TextStyles.extraBold.copyWith(
-                color: AppColors.clrWhiteFFFFFF,
-                fontSize: 32,
-              ),
-            ),
-            const SizedBox(height: 4),
-            CommonText(
-              data: "Proshakti product every Sunday.",
-              style: TextStyles.regular.copyWith(
-                color: AppColors.clrWhiteFFFFFF,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 12),
-            CommonButton(
-              onTap: () {},
-              buttonText: "ORDER NOW",
-              buttonColor: AppColors.clrWhiteFFFFFF,
-              height: 32,
-              width: 100,
-              borderRadius: BorderRadius.circular(6),
-              buttonTextStyle: TextStyles.bold.copyWith(
-                color: AppColors.clr6156F1,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
+        items: topBanners.map((banner) {
+          return Builder(
+            builder: (BuildContext context) {
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    banner,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const ColoredBox(
+                      color: AppColors.clrD7D7FF,
+                      child: Icon(Icons.image, size: 50, color: AppColors.clr6156F1),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        }).toList(),
       ),
+    );
+  }
+
+  Widget _buildDarkBanner(BannerState bannerState) {
+    final videoBanner = bannerState.secondBannerVideo;
+
+    if (videoBanner.isEmpty) {
+      return const SizedBox();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppConstants.defaultPadding),
+      child: VideoBannerWidget(videoUrl: videoBanner),
     );
   }
 
@@ -265,7 +341,23 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildCategoriesList() {
-    final categories = ["Milk", "Ghee", "Paneer"];
+    final catalogState = ref.watch(catalogNotifierProvider);
+    final categories = catalogState.categories;
+
+    if (catalogState.isLoading) {
+      return const SizedBox(
+        height: 140,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (categories.isEmpty) {
+      return const SizedBox(
+        height: 140,
+        child: Center(child: Text("No categories found.")),
+      );
+    }
+
     return SizedBox(
       height: 140,
       child: ListView.separated(
@@ -276,6 +368,7 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
         itemCount: categories.length,
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
+          final category = categories[index];
           return Column(
             children: [
               CommonContainer(
@@ -284,19 +377,35 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                 color: AppColors.clrWhiteFFFFFF,
                 borderRadius: BorderRadius.circular(12),
                 alignment: Alignment.center,
-                child: CommonIcon(
-                  icon: index == 0
-                      ? Icons.water_drop
-                      : index == 1
-                      ? Icons.opacity
-                      : Icons.layers,
-                  color: AppColors.clr6156F1,
-                  size: 40,
-                ),
+                child: (category.image == null || category.image!.isEmpty)
+                    ? CommonIcon(
+                        icon: category.label.toLowerCase() == 'milk'
+                            ? Icons.water_drop
+                            : category.label.toLowerCase() == 'ghee'
+                            ? Icons.opacity
+                            : Icons.layers,
+                        color: AppColors.clr6156F1,
+                        size: 40,
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          category.image!,
+                          height: 100,
+                          width: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const CommonIcon(
+                                icon: Icons.layers,
+                                color: AppColors.clr6156F1,
+                                size: 40,
+                              ),
+                        ),
+                      ),
               ),
               const SizedBox(height: 8),
               CommonText(
-                data: categories[index],
+                data: category.label,
                 style: TextStyles.medium.copyWith(
                   fontSize: 14,
                   color: AppColors.clr101828,
@@ -309,10 +418,20 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildBestSellersList() {
-    final products = CatalogData.products
-        .where((product) => product.isPopular)
-        .toList();
+  Widget _buildHorizontalProductList(List<ProductModel> products, bool isLoading) {
+    if (isLoading) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (products.isEmpty) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: Text("No products available at the moment.")),
+      );
+    }
 
     return SizedBox(
       height: 320,
@@ -439,6 +558,71 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+
+class VideoBannerWidget extends StatefulWidget {
+  final String videoUrl;
+  const VideoBannerWidget({super.key, required this.videoUrl});
+
+  @override
+  State<VideoBannerWidget> createState() => _VideoBannerWidgetState();
+}
+
+class _VideoBannerWidgetState extends State<VideoBannerWidget> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+          });
+          _controller.setLooping(true);
+          _controller.setVolume(0); // Mute for banner
+          _controller.play();
+        }
+      }).catchError((e) {
+        print("Video Error: $e");
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.black,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: _isInitialized
+            ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              )
+            : const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
       ),
     );
   }

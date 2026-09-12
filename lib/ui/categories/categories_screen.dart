@@ -1,5 +1,5 @@
 import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
-import 'package:dairy_app/framework/repository/cart/catalog_data.dart';
+import 'package:dairy_app/framework/provider/catalog/catalog_provider.dart';
 import 'package:dairy_app/framework/repository/cart/product_model.dart';
 import 'package:dairy_app/ui/cart/cart_screen.dart';
 import 'package:dairy_app/ui/products/product_details_screen.dart';
@@ -19,18 +19,19 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
 
-  List<ProductModel> get _visibleProducts =>
-      CatalogData.products.where((product) {
-        final matchesCategory =
-            _selectedCategory == 'All' || product.category == _selectedCategory;
-        final query = _searchQuery.trim().toLowerCase();
-        final matchesSearch =
-            query.isEmpty ||
-            product.name.toLowerCase().contains(query) ||
-            product.brand.toLowerCase().contains(query) ||
-            product.category.toLowerCase().contains(query);
-        return matchesCategory && matchesSearch;
-      }).toList();
+  List<ProductModel> _getVisibleProducts(List<ProductModel> products) {
+    return products.where((product) {
+      final matchesCategory =
+          _selectedCategory == 'All' || product.category == _selectedCategory;
+      final query = _searchQuery.trim().toLowerCase();
+      final matchesSearch =
+          query.isEmpty ||
+          product.name.toLowerCase().contains(query) ||
+          product.brand.toLowerCase().contains(query) ||
+          product.category.toLowerCase().contains(query);
+      return matchesCategory && matchesSearch;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,23 +45,30 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth >= 700;
-                final products = _visibleProducts;
+                final catalogState = ref.watch(catalogNotifierProvider);
+                final categories = catalogState.categories;
+                final products = _getVisibleProducts(catalogState.products);
+                
+                final categoryNames = ['All', ...categories.map((c) => c.label)];
+
                 return isWide
                     ? Row(
                         children: [
                           _CategoryRail(
                             selected: _selectedCategory,
                             onSelected: _selectCategory,
+                            categories: categoryNames,
                           ),
                           Expanded(
                             child: _ProductArea(
                               products: products,
                               isWide: true,
+                              categories: categoryNames,
                             ),
                           ),
                         ],
                       )
-                    : _ProductArea(products: products, isWide: false);
+                    : _ProductArea(products: products, isWide: false, categories: categoryNames);
               },
             ),
           ),
@@ -75,6 +83,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
   Widget _ProductArea({
     required List<ProductModel> products,
     required bool isWide,
+    required List<String> categories,
   }) => Container(
     color: AppColors.clrF7F7F7,
     child: Column(
@@ -126,6 +135,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           _CategoryChips(
             selected: _selectedCategory,
             onSelected: _selectCategory,
+            categories: categories,
           ),
         Padding(
           padding: EdgeInsets.fromLTRB(
@@ -257,7 +267,8 @@ class _Header extends StatelessWidget {
 class _CategoryRail extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
-  const _CategoryRail({required this.selected, required this.onSelected});
+  final List<String> categories;
+  const _CategoryRail({required this.selected, required this.onSelected, required this.categories});
   @override
   Widget build(BuildContext context) => SizedBox(
     width: 142,
@@ -268,9 +279,9 @@ class _CategoryRail extends StatelessWidget {
       ),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        itemCount: CatalogData.categories.length,
+        itemCount: categories.length,
         itemBuilder: (_, index) {
-          final category = CatalogData.categories[index];
+          final category = categories[index];
           final active = category == selected;
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -306,17 +317,18 @@ class _CategoryRail extends StatelessWidget {
 class _CategoryChips extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
-  const _CategoryChips({required this.selected, required this.onSelected});
+  final List<String> categories;
+  const _CategoryChips({required this.selected, required this.onSelected, required this.categories});
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 48,
     child: ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       scrollDirection: Axis.horizontal,
-      itemCount: CatalogData.categories.length,
+      itemCount: categories.length,
       separatorBuilder: (_, __) => const SizedBox(width: 8),
       itemBuilder: (_, index) {
-        final category = CatalogData.categories[index];
+        final category = categories[index];
         final active = category == selected;
         return ChoiceChip(
           label: Text(category),

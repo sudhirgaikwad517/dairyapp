@@ -1,0 +1,426 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { Package, ArrowLeft, Save, RotateCcw, Plus, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
+
+const PRODUCT_TYPES = ['Liquid', 'Solid', 'Powder', 'Other'];
+
+type VariantRow = {
+  id?: string;
+  city: string;
+  packaging: string;
+  ltrs: string;
+  packets: string;
+  rate: string;
+  mrpEcom: string;
+  bottleApplicable: boolean;
+  pouchApplicable: boolean;
+  stockQuantity: string;
+  webVisibility: boolean;
+  appVisibility: boolean;
+};
+
+const emptyVariant: VariantRow = {
+  city: '', packaging: '', ltrs: '', packets: '1', rate: '', mrpEcom: '',
+  bottleApplicable: false, pouchApplicable: false, stockQuantity: '100',
+  webVisibility: true, appVisibility: true
+};
+
+const emptyForm = {
+  categoryId: '', subCategoryId: '', productType: '', name: '', shortCode: '',
+  discount: '0', gstRate: '0', description: '', hsnCode: '', imageUrl: '',
+  prepaidGetonce: true, prepaidSubscribe: true, postpaidGetonce: true, postpaidSubscribe: true
+};
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-500 mb-1">
+        {label}{required && <span className="text-red-600 ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export default function AddEditProduct() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = !!id;
+
+  const [form, setForm] = useState(emptyForm);
+  const [variants, setVariants] = useState<VariantRow[]>([{ ...emptyVariant }]);
+  const [images, setImages] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categoriesLite'],
+    queryFn: async () => (await api.get('/admin/categories')).data.data
+  });
+  const { data: subCategories = [] } = useQuery({
+    queryKey: ['subCategoriesLite', form.categoryId],
+    queryFn: async () => (await api.get('/admin/products/sub-categories', { params: form.categoryId ? { categoryId: form.categoryId } : {} })).data.data,
+    enabled: !!form.categoryId
+  });
+
+  const { data: productDetail, isLoading } = useQuery({
+    queryKey: ['product', id],
+    queryFn: async () => (await api.get(`/admin/products/${id}`)).data.data,
+    enabled: isEdit
+  });
+
+  useEffect(() => {
+    if (productDetail) {
+      const p = productDetail;
+      setForm({
+        categoryId: p.category_id || '',
+        subCategoryId: p.sub_category_id || '',
+        productType: p.product_type || '',
+        name: p.name || '',
+        shortCode: p.short_code || '',
+        discount: String(p.discount ?? 0),
+        gstRate: String(p.gst_rate ?? 0),
+        description: p.description || '',
+        hsnCode: p.hsn_code || '',
+        imageUrl: p.image_url || '',
+        prepaidGetonce: p.prepaid_getonce !== false,
+        prepaidSubscribe: p.prepaid_subscribe !== false,
+        postpaidGetonce: p.postpaid_getonce !== false,
+        postpaidSubscribe: p.postpaid_subscribe !== false
+      });
+      if (Array.isArray(p.product_variants) && p.product_variants.length > 0) {
+        setVariants(p.product_variants.map((v: any) => ({
+          id: v.id,
+          city: v.city || '',
+          packaging: v.size_label || '',
+          ltrs: v.ltrs !== null && v.ltrs !== undefined ? String(v.ltrs) : '',
+          packets: String(v.packets ?? 1),
+          rate: String(v.buy_once ?? 0),
+          mrpEcom: String(v.mrp_ecom ?? 0),
+          bottleApplicable: !!v.bottle_applicable,
+          pouchApplicable: !!v.pouch_applicable,
+          stockQuantity: String(v.stock_quantity ?? 0),
+          webVisibility: v.web_visibility !== false,
+          appVisibility: v.app_visibility !== false
+        })));
+      }
+      if (Array.isArray(p.product_images)) {
+        setImages(p.product_images.map((img: any) => img.image_url));
+      }
+    }
+  }, [productDetail]);
+
+  const setField = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+  };
+
+  const setVariant = (index: number, key: keyof VariantRow, value: string | boolean) => {
+    setVariants((rows) => rows.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+  };
+
+  const addVariant = () => setVariants((rows) => [...rows, { ...emptyVariant }]);
+  const removeVariant = (index: number) => setVariants((rows) => rows.length > 1 ? rows.filter((_, i) => i !== index) : rows);
+
+  const addImage = () => {
+    if (newImageUrl.trim()) {
+      setImages((imgs) => [...imgs, newImageUrl.trim()]);
+      setNewImageUrl('');
+    }
+  };
+  const removeImage = (index: number) => setImages((imgs) => imgs.filter((_, i) => i !== index));
+
+  const isLiquid = form.productType === 'Liquid';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!form.categoryId || !form.name.trim() || !form.shortCode.trim()) {
+      setError('Category, product name and shortcode are required.');
+      return;
+    }
+    if (variants.some((v) => !v.city || !v.packaging || !v.rate)) {
+      setError('Each product detail row needs a city, packaging and rate.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        categoryId: form.categoryId,
+        subCategoryId: form.subCategoryId || null,
+        productType: form.productType || null,
+        name: form.name.trim(),
+        shortCode: form.shortCode.trim(),
+        discount: Number(form.discount || 0),
+        gstRate: Number(form.gstRate || 0),
+        description: form.description || undefined,
+        hsnCode: form.hsnCode || undefined,
+        imageUrl: form.imageUrl || undefined,
+        prepaidGetonce: form.prepaidGetonce,
+        prepaidSubscribe: form.prepaidSubscribe,
+        postpaidGetonce: form.postpaidGetonce,
+        postpaidSubscribe: form.postpaidSubscribe,
+        images,
+        variants: variants.map((v) => ({
+          id: v.id,
+          city: v.city,
+          packaging: v.packaging,
+          ltrs: v.ltrs === '' ? undefined : Number(v.ltrs),
+          packets: Number(v.packets || 1),
+          rate: Number(v.rate || 0),
+          mrpEcom: Number(v.mrpEcom || 0),
+          bottleApplicable: v.bottleApplicable,
+          pouchApplicable: v.pouchApplicable,
+          stockQuantity: Number(v.stockQuantity || 0),
+          webVisibility: v.webVisibility,
+          appVisibility: v.appVisibility
+        }))
+      };
+
+      if (isEdit) {
+        await api.patch(`/admin/products/${id}`, payload);
+      } else {
+        await api.post('/admin/products', payload);
+      }
+      navigate('/products');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to save product. Please check the details and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isEdit && isLoading) {
+    return <div className="text-gray-500 p-8">Loading product...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="icon" onClick={() => navigate('/products')}>
+          <ArrowLeft size={16} />
+        </Button>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <Package className="text-blue-600" /> {isEdit ? 'Edit Product' : 'Add New Product'}
+          </h2>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-3">{error}</div>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Product Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 border-t border-gray-100 pt-4">
+            <Field label="Category" required>
+              <Select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value, subCategoryId: '' }))} required>
+                <option value="">Select Category</option>
+                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Sub Category">
+              <Select value={form.subCategoryId} onChange={setField('subCategoryId')} disabled={!form.categoryId}>
+                <option value="">Select Sub Category</option>
+                {subCategories.map((s: any) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Product Type">
+              <Select value={form.productType} onChange={setField('productType')}>
+                <option value="">Select Product Type</option>
+                {PRODUCT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            </Field>
+            <Field label="Product Name" required>
+              <Input value={form.name} onChange={setField('name')} required />
+            </Field>
+            <Field label="Product Shortcode" required>
+              <Input value={form.shortCode} onChange={setField('shortCode')} placeholder="e.g. CM1L" required />
+            </Field>
+            <Field label="HSN Code">
+              <Input value={form.hsnCode} onChange={setField('hsnCode')} />
+            </Field>
+            <Field label="Discount (Rs)">
+              <Input type="number" value={form.discount} onChange={setField('discount')} />
+            </Field>
+            <Field label="GST (%)">
+              <Input type="number" value={form.gstRate} onChange={setField('gstRate')} />
+            </Field>
+            <Field label="Main Product Image URL">
+              <Input value={form.imageUrl} onChange={setField('imageUrl')} placeholder="https://..." />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Field label="Description">
+                <textarea
+                  className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  rows={3}
+                  value={form.description}
+                  onChange={setField('description')}
+                />
+              </Field>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Gallery Images</CardTitle>
+            <CardDescription>Additional image URLs shown in the product gallery.</CardDescription>
+          </CardHeader>
+          <CardContent className="border-t border-gray-100 pt-4 space-y-4">
+            <div className="flex gap-2">
+              <Input placeholder="Enter image URL..." value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} />
+              <Button type="button" variant="secondary" onClick={addImage} className="gap-2 shrink-0">
+                <Plus size={16} /> Add
+              </Button>
+            </div>
+            {images.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                {images.map((url, index) => (
+                  <div key={index} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50 h-24">
+                    <img src={url} alt={`Gallery ${index + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                    >
+                      <X className="text-white" size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Customer Eligibility</CardTitle>
+            <CardDescription>Choose how this product can be purchased.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 sm:grid-cols-2 border-t border-gray-100 pt-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Prepaid Customer</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" checked={form.prepaidGetonce} onChange={(e) => setForm((f) => ({ ...f, prepaidGetonce: e.target.checked }))} /> One Time Order
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" checked={form.prepaidSubscribe} onChange={(e) => setForm((f) => ({ ...f, prepaidSubscribe: e.target.checked }))} /> Subscribe
+                </label>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Postpaid Customer</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" checked={form.postpaidGetonce} onChange={(e) => setForm((f) => ({ ...f, postpaidGetonce: e.target.checked }))} /> One Time Order
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" checked={form.postpaidSubscribe} onChange={(e) => setForm((f) => ({ ...f, postpaidSubscribe: e.target.checked }))} /> Subscribe
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Product Details</CardTitle>
+                <CardDescription>Add one row per city — packaging, pricing and visibility can differ by city.</CardDescription>
+              </div>
+              <Button type="button" variant="secondary" onClick={addVariant} className="gap-2 shrink-0">
+                <Plus size={16} /> Add City
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="border-t border-gray-100 pt-4 space-y-6">
+            {variants.map((v, index) => (
+              <div key={index} className="rounded-lg border border-gray-200 p-4 relative">
+                {variants.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeVariant(index)}
+                    className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-md border border-gray-300 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                    title="Remove this city"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="City" required>
+                    <Input value={v.city} onChange={(e) => setVariant(index, 'city', e.target.value)} placeholder="e.g. Pune" required />
+                  </Field>
+                  <Field label="Packaging" required>
+                    <Input value={v.packaging} onChange={(e) => setVariant(index, 'packaging', e.target.value)} placeholder="e.g. 1L, 500g" required />
+                  </Field>
+                  <Field label={isLiquid ? 'Ltrs' : 'Ltrs (if applicable)'}>
+                    <Input type="number" step="0.01" value={v.ltrs} onChange={(e) => setVariant(index, 'ltrs', e.target.value)} placeholder={isLiquid ? '' : 'N/A for this product type'} />
+                  </Field>
+                  <Field label="Packets">
+                    <Input type="number" value={v.packets} onChange={(e) => setVariant(index, 'packets', e.target.value)} />
+                  </Field>
+                  <Field label="Product Rate (SP)" required>
+                    <Input type="number" value={v.rate} onChange={(e) => setVariant(index, 'rate', e.target.value)} required />
+                  </Field>
+                  <Field label="MRP (Ecom Order)">
+                    <Input type="number" value={v.mrpEcom} onChange={(e) => setVariant(index, 'mrpEcom', e.target.value)} />
+                  </Field>
+                  <Field label="Stock Quantity">
+                    <Input type="number" value={v.stockQuantity} onChange={(e) => setVariant(index, 'stockQuantity', e.target.value)} />
+                  </Field>
+                  <div className="flex items-end gap-4 pb-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" checked={v.bottleApplicable} onChange={(e) => setVariant(index, 'bottleApplicable', e.target.checked)} /> Bottle
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" checked={v.pouchApplicable} onChange={(e) => setVariant(index, 'pouchApplicable', e.target.checked)} /> Pouch
+                    </label>
+                  </div>
+                  <div className="flex items-end gap-4 pb-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" checked={v.webVisibility} onChange={(e) => setVariant(index, 'webVisibility', e.target.checked)} /> Web Visible
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" checked={v.appVisibility} onChange={(e) => setVariant(index, 'appVisibility', e.target.checked)} /> App Visible
+                    </label>
+                  </div>
+                  <div className="flex items-end pb-2">
+                    {Number(v.stockQuantity) <= 0 ? (
+                      <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2.5 py-1">Out of Stock</span>
+                    ) : (
+                      <span className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">In Stock</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-3">
+          <Button type="submit" disabled={saving} className="gap-2">
+            <Save size={16} /> {saving ? 'Saving...' : isEdit ? 'Update Product' : 'Create'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/products')} className="gap-2">
+            <RotateCcw size={16} /> Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}

@@ -8,6 +8,7 @@ import 'package:dairy_app/ui/utils/widgets/common_button.dart';
 import 'package:dairy_app/ui/utils/widgets/common_container.dart';
 import 'package:dairy_app/ui/utils/widgets/common_icon.dart';
 import 'package:dairy_app/ui/utils/widgets/common_text.dart';
+import 'package:dairy_app/framework/provider/catalog/catalog_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,8 +22,10 @@ class BestSellers extends ConsumerStatefulWidget {
 class _BestSellersConsumerState extends ConsumerState<BestSellers> {
   @override
   Widget build(BuildContext context) {
-    final bestSellersWatch = ref.watch(bestSellersProvider);
-    final products = bestSellersWatch.bestSellers;
+    final catalogState = ref.watch(catalogNotifierProvider);
+    final products = catalogState.products
+        .where((product) => product.isPopular)
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.clrF7F7F7,
@@ -39,8 +42,7 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
                 mainAxisSpacing: 16,
               ),
               itemBuilder: (context, index) {
-                final item = products[index];
-                final product = item.product;
+                final product = products[index];
                 return GestureDetector(
                   onTap: () => Navigator.push(
                     context,
@@ -90,7 +92,7 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
                                   topRight: Radius.circular(12),
                                 ),
                                 child: CommonText(
-                                  data: item.tag,
+                                  data: 'Top Rated',
                                   style: TextStyles.bold.copyWith(
                                     fontSize: 10,
                                     color: AppColors.clrWhiteFFFFFF,

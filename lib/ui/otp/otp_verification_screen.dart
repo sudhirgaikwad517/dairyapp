@@ -11,6 +11,7 @@ import 'package:dairy_app/ui/utils/widgets/common_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinput/pinput.dart';
+import 'package:dairy_app/framework/provider/auth_provider.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   const OtpVerificationScreen({super.key});
@@ -113,13 +114,24 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
                                     fontSize: 18,
                                   ),
                                 ),
+                                if (ref.watch(authNotifierProvider).debugOtp != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: CommonText(
+                                      data: "Test OTP: ${ref.watch(authNotifierProvider).debugOtp}",
+                                      style: TextStyles.bold.copyWith(
+                                        color: Colors.red,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
                                 const SizedBox(height: 45),
 
                                 /// OTP Input
                                 Pinput(
                                   autofocus: true,
                                   controller: watchOtpVerificationProvider.otpController,
-                                  length: 4,
+                                  length: 6,
                                   defaultPinTheme: defaultPinTheme,
                                   focusedPinTheme: defaultPinTheme.copyDecorationWith(
                                     border: Border.all(
@@ -161,88 +173,123 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
                                 const Spacer(),
 
                                 /// Verify Button
-                                CommonButton(
-                                  onTap: () {
-                                    CommonDialog.showConfirmDialog(
-                                      context,
-                                      body: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const SizedBox(height: 10),
-                                          CommonContainer(
-                                            height: 85,
-                                            width: 85,
-                                            borderRadius: BorderRadius.circular(42.5),
-                                            color: AppColors.clr6156F1.withValues(alpha: 0.1),
-                                            alignment: Alignment.center,
-                                            child: const CommonIcon(
-                                              icon: Icons.check,
-                                              color: AppColors.clr6156F1,
-                                              size: 45,
-                                              fontWeight: FontWeight.bold,
+                                Consumer(builder: (context, ref, child) {
+                                  final authState = ref.watch(authNotifierProvider);
+                                  return CommonButton(
+                                    onTap: authState.isLoading ? () {} : () async {
+                                      final otp = watchOtpVerificationProvider.otpController.text;
+                                      if (otp.length < 6) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: const Text("Enter a valid 6-digit OTP"),
+                                            behavior: SnackBarBehavior.floating,
+                                            margin: EdgeInsets.only(
+                                              bottom: MediaQuery.of(context).size.height - 150,
+                                              left: 20,
+                                              right: 20,
                                             ),
                                           ),
-                                          const SizedBox(height: 24),
-                                          CommonText(
-                                            data: "Verified",
-                                            style: TextStyles.bold.copyWith(
-                                              fontSize: 24,
-                                              color: AppColors.clr6156F1,
+                                        );
+                                        return;
+                                      }
+                                      
+                                      final success = await ref.read(authNotifierProvider.notifier).verifyOtp(otp);
+                                      if (success && mounted) {
+                                        CommonDialog.showConfirmDialog(
+                                          context,
+                                          body: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const SizedBox(height: 10),
+                                              CommonContainer(
+                                                height: 85,
+                                                width: 85,
+                                                borderRadius: BorderRadius.circular(42.5),
+                                                color: AppColors.clr6156F1.withValues(alpha: 0.1),
+                                                alignment: Alignment.center,
+                                                child: const CommonIcon(
+                                                  icon: Icons.check,
+                                                  color: AppColors.clr6156F1,
+                                                  size: 45,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 24),
+                                              CommonText(
+                                                data: "Verified",
+                                                style: TextStyles.bold.copyWith(
+                                                  fontSize: 24,
+                                                  color: AppColors.clr6156F1,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              CommonText(
+                                                data: "You have successfully verified\nthe account.",
+                                                textAlign: TextAlign.center,
+                                                style: TextStyles.regular.copyWith(
+                                                  fontSize: 16,
+                                                  color: AppColors.clrGrey757575,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 32),
+                                              CommonButton(
+                                                onTap: () {
+                                                  Navigator.pushAndRemoveUntil(
+                                                    context,
+                                                    MaterialPageRoute(builder: (context) => const BaseScreen()),
+                                                    ModalRoute.withName('/'),
+                                                  );
+                                                },
+                                                buttonText: "Done",
+                                                height: 54,
+                                                width: double.infinity,
+                                                borderRadius: BorderRadius.circular(15),
+                                                gradient: const LinearGradient(
+                                                  colors: [
+                                                    AppColors.clr6156F1,
+                                                    AppColors.clr6B60FE,
+                                                  ],
+                                                ),
+                                                buttonTextStyle: TextStyles.bold.copyWith(
+                                                  fontSize: 18,
+                                                  color: AppColors.clrWhiteFFFFFF,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                            ],
+                                          ),
+                                        );
+                                      } else if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(ref.read(authNotifierProvider).error ?? "Failed to verify OTP"),
+                                            behavior: SnackBarBehavior.floating,
+                                            backgroundColor: Colors.redAccent,
+                                            margin: EdgeInsets.only(
+                                              bottom: MediaQuery.of(context).size.height - 150,
+                                              left: 20,
+                                              right: 20,
                                             ),
                                           ),
-                                          const SizedBox(height: 12),
-                                          CommonText(
-                                            data: "You have successfully verified\nthe account.",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyles.regular.copyWith(
-                                              fontSize: 16,
-                                              color: AppColors.clrGrey757575,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 32),
-                                          CommonButton(
-                                            onTap: () {
-                                              Navigator.pushAndRemoveUntil(
-                                                context,
-                                                MaterialPageRoute(builder: (context) => const BaseScreen()),
-                                                ModalRoute.withName('/'),
-                                              );
-                                            },
-                                            buttonText: "Done",
-                                            height: 54,
-                                            width: double.infinity,
-                                            borderRadius: BorderRadius.circular(15),
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                AppColors.clr6156F1,
-                                                AppColors.clr6B60FE,
-                                              ],
-                                            ),
-                                            buttonTextStyle: TextStyles.bold.copyWith(
-                                              fontSize: 18,
-                                              color: AppColors.clrWhiteFFFFFF,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  buttonText: "Verify",
-                                  height: 58,
-                                  width: double.infinity,
-                                  borderRadius: BorderRadius.circular(18),
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      AppColors.clr6156F1,
-                                      AppColors.clr6B60FE,
-                                    ],
-                                  ),
-                                  buttonTextStyle: TextStyles.bold.copyWith(
-                                    fontSize: 20,
-                                    color: AppColors.clrWhiteFFFFFF,
-                                  ),
-                                ),
+                                        );
+                                      }
+                                    },
+                                    buttonText: authState.isLoading ? "Verifying..." : "Verify",
+                                    height: 58,
+                                    width: double.infinity,
+                                    borderRadius: BorderRadius.circular(18),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.clr6156F1,
+                                        AppColors.clr6B60FE,
+                                      ],
+                                    ),
+                                    buttonTextStyle: TextStyles.bold.copyWith(
+                                      fontSize: 20,
+                                      color: AppColors.clrWhiteFFFFFF,
+                                    ),
+                                  );
+                                }),
                                 const SizedBox(height: 20),
                               ],
                             ),
