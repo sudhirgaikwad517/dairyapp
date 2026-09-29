@@ -29,6 +29,41 @@ function mapAddress(a: any) {
   };
 }
 
+async function syncDefaultAddressToCustomer(tx: any, customerId: string) {
+  const defaultAddr = await tx.customer_addresses.findFirst({
+    where: { customer_id: customerId, is_default: true }
+  });
+  if (defaultAddr) {
+    await tx.customers.update({
+      where: { id: customerId },
+      data: {
+        flat_no: defaultAddr.flat_no,
+        society_name: defaultAddr.society_name,
+        street_name: defaultAddr.street_name,
+        landmark: defaultAddr.landmark,
+        city: defaultAddr.city,
+        state: defaultAddr.state,
+        pincode: defaultAddr.pincode,
+        address: composeAddress(defaultAddr)
+      }
+    });
+  } else {
+    await tx.customers.update({
+      where: { id: customerId },
+      data: {
+        flat_no: null,
+        society_name: null,
+        street_name: null,
+        landmark: null,
+        city: null,
+        state: null,
+        pincode: null,
+        address: null
+      }
+    });
+  }
+}
+
 export class CustomerAddressController {
   public async index(req: Request, res: Response) {
     try {
@@ -71,7 +106,7 @@ export class CustomerAddressController {
         if (makeDefault) {
           await tx.customer_addresses.updateMany({ where: { customer_id: customer.id }, data: { is_default: false } });
         }
-        return tx.customer_addresses.create({
+        const addr = await tx.customer_addresses.create({
           data: {
             id: crypto.randomUUID(),
             customer_id: customer.id,
@@ -88,6 +123,8 @@ export class CustomerAddressController {
             updated_at: now
           }
         });
+        await syncDefaultAddressToCustomer(tx, customer.id);
+        return addr;
       });
 
       return res.status(201).json({ success: true, data: mapAddress(created) });
@@ -124,7 +161,13 @@ export class CustomerAddressController {
         data.pincode = cleanPincode;
       }
 
-      const updated = await prisma.customer_addresses.update({ where: { id: existing.id }, data });
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.customer_addresses.update({ where: { id: existing.id }, data });
+        if (existing.is_default) {
+          await syncDefaultAddressToCustomer(tx, customer.id);
+        }
+        return u;
+      });
       return res.status(200).json({ success: true, data: mapAddress(updated) });
     } catch (error) {
       console.error(error);
@@ -155,6 +198,7 @@ export class CustomerAddressController {
           if (next) {
             await tx.customer_addresses.update({ where: { id: next.id }, data: { is_default: true } });
           }
+          await syncDefaultAddressToCustomer(tx, customer.id);
         }
       });
 
@@ -175,10 +219,11 @@ export class CustomerAddressController {
         return res.status(404).json({ success: false, message: 'Address not found' });
       }
 
-      await prisma.$transaction([
-        prisma.customer_addresses.updateMany({ where: { customer_id: customer.id }, data: { is_default: false } }),
-        prisma.customer_addresses.update({ where: { id: existing.id }, data: { is_default: true, updated_at: new Date() } })
-      ]);
+      await prisma.$transaction(async (tx) => {
+        await tx.customer_addresses.updateMany({ where: { customer_id: customer.id }, data: { is_default: false } });
+        await tx.customer_addresses.update({ where: { id: existing.id }, data: { is_default: true, updated_at: new Date() } });
+        await syncDefaultAddressToCustomer(tx, customer.id);
+      });
 
       return res.status(200).json({ success: true, data: {} });
     } catch (error) {
