@@ -18,8 +18,8 @@ export default function Login() {
   const navigate = useNavigate();
 
   const adminUrl = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5555/api/v1';
-    return apiUrl.replace('/api/v1', '/api/admin');
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5555/api';
+    return `${apiUrl}/admin`;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
