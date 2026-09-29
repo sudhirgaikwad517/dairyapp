@@ -29,4 +29,12 @@ class BaseController extends ChangeNotifier{
     notifyListeners();
   }
 
+  /// Switches the bottom-nav to a tab by its title. Tab screens have no
+  /// Scaffold of their own, so they must be shown through this shell rather
+  /// than pushed as a standalone route.
+  void selectTabByTitle(String title) {
+    final index = bottomList.indexWhere((tab) => tab.title == title);
+    if (index != -1) updateIndex(index);
+  }
+
 }

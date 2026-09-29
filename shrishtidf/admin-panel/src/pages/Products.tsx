@@ -145,6 +145,9 @@ export default function Products() {
                 <TableHead>Shortcode</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Sub Category</TableHead>
+                <TableHead className="text-right">Buy Once</TableHead>
+                <TableHead className="text-right">Subscribe</TableHead>
+                <TableHead>Tag</TableHead>
                 <TableHead className="text-right">Discount</TableHead>
                 <TableHead className="text-right">GST</TableHead>
                 <TableHead>HSN Code</TableHead>
@@ -162,12 +165,43 @@ export default function Products() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium text-gray-900 block">{p.name}</span>
-                    {p.variantCount > 1 && <span className="text-xs text-blue-600">{p.variantCount} city variants</span>}
+                    <span className="font-medium text-gray-900 inline-flex items-center gap-1.5">
+                      <span
+                        className={`inline-flex h-3 w-3 shrink-0 items-center justify-center border ${
+                          p.foodType === 'non_veg' ? 'border-red-600' : 'border-green-600'
+                        }`}
+                        title={p.foodType === 'non_veg' ? 'Non-Veg' : 'Veg'}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${p.foodType === 'non_veg' ? 'bg-red-600' : 'bg-green-600'}`} />
+                      </span>
+                      {p.name}
+                    </span>
+                    {p.variantCount > 1 && <span className="text-xs text-blue-600 block">{p.variantCount} city variants</span>}
                   </TableCell>
                   <TableCell className="font-mono text-gray-700">{p.shortCode || '—'}</TableCell>
                   <TableCell className="text-gray-700">{p.category}</TableCell>
                   <TableCell className="text-gray-700">{p.subCategory || '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-semibold text-gray-900">₹{p.price ?? 0}</span>
+                    {/* MRP is only shown when the admin actually entered one. */}
+                    {p.mrp > (p.price ?? 0) && (
+                      <span className="ml-1.5 text-xs text-gray-400 line-through">₹{p.mrp}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="font-semibold text-gray-900">₹{p.subscriptionPrice ?? 0}</span>
+                    {p.mrp > (p.subscriptionPrice ?? 0) && (
+                      <span className="ml-1.5 text-xs text-gray-400 line-through">₹{p.mrp}</span>
+                    )}
+                    {p.subscriptionPrice !== p.price && (
+                      <span className="block text-[10px] text-blue-600">differs from Buy Once</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {p.badge
+                      ? <Badge variant="outline">{p.badge}</Badge>
+                      : <span className="text-gray-400">—</span>}
+                  </TableCell>
                   <TableCell className="text-right text-gray-800 font-medium">₹{p.discount}</TableCell>
                   <TableCell className="text-right text-gray-800 font-medium">{p.gst}%</TableCell>
                   <TableCell className="text-gray-600">{p.hsnCode || '—'}</TableCell>
@@ -189,7 +223,7 @@ export default function Products() {
               ))}
               {rows.length === 0 && !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-6 text-gray-500">
+                  <TableCell colSpan={14} className="text-center py-6 text-gray-500">
                     No products found.
                   </TableCell>
                 </TableRow>

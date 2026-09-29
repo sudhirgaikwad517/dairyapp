@@ -5,8 +5,9 @@ import { ArrowLeft, Star } from "lucide-react";
 import { ContentCard } from "@/components/layout/ContentCard";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { useCartContext } from "@/context/cart-context";
+import { FoodTypeMark, OutOfStockPill, PriceWithMrp } from "@/components/ProductMarks";
 import { getProductById } from "@/lib/services/product.service";
-import { getDefaultVariant } from "@/lib/product-helpers";
+import { getDefaultVariant, isProductInStock, isVegProduct } from "@/lib/product-helpers";
 import type { ProductItem, ProductVariant } from "@/lib/types";
 
 const bottle = "/assets/bottle.jpg";
@@ -79,6 +80,16 @@ function ProductDetailInner({ id }: { id: string }) {
   const sizeLabel = activeVariant?.sizeLabel ?? product.size;
   const variantId = activeVariant?.id;
 
+  // Only an admin-entered MRP is shown struck through — never a derived one.
+  const mrpCandidate = Math.max(activeVariant?.mrp ?? 0, product.mrp ?? 0);
+  const mrp = mrpCandidate > buyOncePrice ? mrpCandidate : 0;
+  const discountPercent = mrp > 0 ? Math.round(((mrp - buyOncePrice) / mrp) * 100) : 0;
+
+  // The chosen variant decides availability; fall back to the product.
+  const inStock = activeVariant
+    ? activeVariant.inStock !== false
+    : isProductInStock(product);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
       <Link
@@ -96,10 +107,11 @@ function ProductDetailInner({ id }: { id: string }) {
                 {product.badge}
               </span>
             )}
+            {!inStock && <OutOfStockPill className="absolute top-3 right-3 z-[2]" />}
             <img
               src={imageSrc}
               alt={product.name}
-              className="relative z-[1] max-h-72 w-auto object-contain drop-shadow-xl"
+              className={`relative z-[1] max-h-72 w-auto object-contain drop-shadow-xl ${inStock ? "" : "opacity-50 grayscale"}`}
             />
           </div>
         </ContentCard>
@@ -111,7 +123,10 @@ function ProductDetailInner({ id }: { id: string }) {
             </div>
           )}
           <div>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">{product.name}</h1>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
+              <FoodTypeMark isVeg={isVegProduct(product)} className="mr-2 h-4 w-4 align-[2px]" />
+              {product.name}
+            </h1>
             <p className="mt-1 text-muted-foreground">{sizeLabel}</p>
           </div>
 
@@ -152,7 +167,12 @@ function ProductDetailInner({ id }: { id: string }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl milk-price-box px-4 py-3">
               <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Buy Once</div>
-              <div className="text-2xl font-extrabold text-foreground mt-1">₹{buyOncePrice}</div>
+              <PriceWithMrp
+                price={buyOncePrice}
+                mrp={mrp}
+                discountPercent={discountPercent}
+                className="mt-1 text-2xl"
+              />
             </div>
             <div className="rounded-xl milk-price-sub px-4 py-3">
               <div className="text-[10px] font-semibold text-primary uppercase tracking-wide">Subscription</div>
@@ -164,14 +184,16 @@ function ProductDetailInner({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => addItem(product.id, "BUY_ONCE", true, variantId)}
-              className="btn-press flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold hover:bg-primary/90 milk-btn-primary"
+              disabled={!inStock}
+              className="btn-press flex-1 rounded-full bg-primary text-primary-foreground py-3 text-sm font-semibold hover:bg-primary/90 milk-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Order Now
+              {inStock ? "Order Now" : "Sold Out"}
             </button>
             <button
               type="button"
               onClick={() => addItem(product.id, "SUBSCRIPTION", false, variantId)}
-              className="btn-press flex-1 rounded-full border-2 border-primary text-primary py-3 text-sm font-semibold hover:bg-primary-soft"
+              disabled={!inStock}
+              className="btn-press flex-1 rounded-full border-2 border-primary text-primary py-3 text-sm font-semibold hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add to Cart
             </button>

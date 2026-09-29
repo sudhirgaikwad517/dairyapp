@@ -1,3 +1,5 @@
+import 'package:dairy_app/framework/dependency_injection/inject.dart';
+import 'package:dairy_app/framework/repository/app_assets/app_assets_cache.dart';
 import 'package:dairy_app/ui/otp/otp_verification_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
@@ -8,6 +10,7 @@ import 'package:dairy_app/ui/utils/widgets/common_button.dart';
 import 'package:dairy_app/ui/utils/widgets/common_container.dart';
 import 'package:dairy_app/ui/utils/widgets/common_text.dart';
 import 'package:dairy_app/ui/utils/widgets/common_text_form_field.dart';
+import 'package:dairy_app/ui/utils/widgets/remote_or_asset_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dairy_app/framework/provider/auth_provider.dart';
@@ -45,8 +48,9 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
           child: Column(
             children: [
               /// Top Image Section
-              CommonAssetImage(
-                path: Assets.images.loginPageBackground.path,
+              RemoteOrAssetImage(
+                remoteUrl: getIt<AppAssetsCache>().loginImageUrl,
+                assetPath: Assets.images.loginPageBackground.path,
                 height: size.height * 0.52,
                 width: double.infinity,
                 fit: BoxFit.cover,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
@@ -103,7 +103,7 @@ export default function Inventory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((batch) => (
+              {filtered.map((batch: any) => (
                 <TableRow key={batch.id}>
                   <TableCell className="font-mono text-gray-600">{batch.id}</TableCell>
                   <TableCell className="font-medium text-gray-900">{batch.product}</TableCell>

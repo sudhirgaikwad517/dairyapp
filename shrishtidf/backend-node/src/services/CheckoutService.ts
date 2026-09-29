@@ -1,9 +1,9 @@
 import prisma from '../db/prisma';
 import { cartService } from './CartService';
 import { randomUUID } from 'crypto';
-import crypto from 'crypto';
 import { activityLogService } from './ActivityLogService';
 import { formatDateOnly } from './CutoffService';
+import { razorpayService } from './RazorpayService';
 
 export class CheckoutService {
   private async getSettings() {
@@ -83,12 +83,21 @@ export class CheckoutService {
     const settings = await this.getSettings();
 
     const lines = await this.buildLineTotals(cart.items);
-    
-    const subtotal = lines.reduce((acc, line) => acc + line.lineTotal, 0);
+
+    // `subtotal` is the pre-tax base (what "minimum order value" and the free
+    // delivery threshold are measured against, matching how those settings
+    // are configured) — it, `taxAmount` and `deliveryFee` add up exactly to
+    // `totalAmount`, so the bill shown to the customer is fully transparent.
+    const subtotal = lines.reduce((acc, line) => acc + line.baseAmount, 0);
     const taxAmount = lines.reduce((acc, line) => acc + line.taxAmount, 0);
-    
+    // What the customer actually spends on the items themselves, tax included
+    // — the figure "minimum order value" and "free delivery threshold" are
+    // meant to be measured against, unaffected by this fix to how `subtotal`
+    // is broken down for display.
+    const itemsTotal = subtotal + taxAmount;
+
     let deliveryFee = 0;
-    if (zone.serviceable && subtotal < settings.freeDeliveryThreshold) {
+    if (zone.serviceable && itemsTotal < settings.freeDeliveryThreshold) {
       deliveryFee = zone.deliveryFee;
     }
 
@@ -100,9 +109,9 @@ export class CheckoutService {
       subtotal,
       taxAmount,
       deliveryFee,
-      totalAmount: subtotal + deliveryFee,
+      totalAmount: subtotal + taxAmount + deliveryFee,
       minOrderValue,
-      meetsMinimum: subtotal >= minOrderValue,
+      meetsMinimum: itemsTotal >= minOrderValue,
       freeDeliveryThreshold: settings.freeDeliveryThreshold,
       walletEnabled: settings.walletEnabled
     };
@@ -121,23 +130,30 @@ export class CheckoutService {
     }
 
     const lines = await this.buildLineTotals(cart.items);
-    const subtotal = lines.reduce((acc, line) => acc + line.lineTotal, 0);
+    const subtotal = lines.reduce((acc, line) => acc + line.baseAmount, 0);
     const taxAmount = lines.reduce((acc, line) => acc + line.taxAmount, 0);
+    const itemsTotal = subtotal + taxAmount;
     const minOrder = zone.minOrderValue;
 
-    if (subtotal < minOrder) {
+    if (itemsTotal < minOrder) {
       throw new Error('BELOW_MINIMUM_ORDER');
     }
 
     const settings = await this.getSettings();
     let deliveryFee = 0;
-    if (subtotal < settings.freeDeliveryThreshold) {
+    if (itemsTotal < settings.freeDeliveryThreshold) {
       deliveryFee = zone.deliveryFee;
     }
 
     const paymentMethod = input.paymentMethod || 'cod';
-    let walletUse = Math.max(0, Number(input.walletAmount) || 0);
-    const totalAmount = subtotal + deliveryFee;
+    const totalAmount = itemsTotal + deliveryFee;
+
+    // Paying by wallet means the wallet covers the whole order — the amount is
+    // computed here rather than taken from the request, so a client can't ask
+    // for a "wallet" order while deducting nothing.
+    let walletUse = paymentMethod === 'wallet'
+      ? totalAmount
+      : Math.max(0, Number(input.walletAmount) || 0);
 
     if (walletUse > 0 && !customer) {
       throw new Error('WALLET_REQUIRES_LOGIN');
@@ -156,8 +172,12 @@ export class CheckoutService {
       }
     }
 
+    if (paymentMethod === 'wallet' && walletUse < totalAmount) {
+      throw new Error('INSUFFICIENT_WALLET_BALANCE');
+    }
+
     if (paymentMethod === 'razorpay') {
-      const verified = this.verifyRazorpayPayment(
+      const verified = await this.verifyRazorpayPayment(
         input.razorpayOrderId || '',
         input.razorpayPaymentId || '',
         input.razorpaySignature || ''
@@ -320,20 +340,27 @@ export class CheckoutService {
         unitPrice = purchaseType === 'SUBSCRIPTION' ? Number(product.subscription) : Number(product.buy_once);
       }
 
-      // Calculate Tax
+      // Calculate Tax. `baseAmount` (pre-tax) and `taxAmount` always add up to
+      // `lineTotal` (what's actually charged) — kept separate so the bill
+      // breakdown shown to the customer is additive (base + tax + delivery =
+      // total) instead of silently double-counting or hiding the tax already
+      // folded into a tax-inclusive price.
       const gstRate = Number(product.gst_rate || 0);
       const isTaxInclusive = product.is_tax_inclusive !== false;
       const amount = unitPrice * item.quantity;
       let taxAmount = 0;
       let totalAmount = amount;
+      let baseAmount = amount;
 
       if (gstRate > 0) {
         if (isTaxInclusive) {
           const base = (amount * 100) / (100 + gstRate);
           taxAmount = Math.round(amount - base);
+          baseAmount = amount - taxAmount;
         } else {
           taxAmount = Math.round((amount * gstRate) / 100);
           totalAmount = amount + taxAmount;
+          baseAmount = amount;
         }
       }
 
@@ -346,6 +373,7 @@ export class CheckoutService {
         unitPrice,
         purchaseType,
         lineTotal: totalAmount,
+        baseAmount,
         taxAmount,
         gstRate
       });
@@ -354,16 +382,11 @@ export class CheckoutService {
     return lines;
   }
 
-  private verifyRazorpayPayment(orderId: string, paymentId: string, signature: string) {
-    if (!orderId || !paymentId || !signature) return false;
-    const secret = process.env.RAZORPAY_API_SECRET;
-    if (!secret) return true; // Skip verification if not configured
-    
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(`${orderId}|${paymentId}`);
-    const generated = hmac.digest('hex');
-    
-    return generated === signature;
+  /// Fails closed: an order is only marked paid when Razorpay's own signature
+  /// checks out AND Razorpay confirms the payment was actually collected.
+  private async verifyRazorpayPayment(orderId: string, paymentId: string, signature: string) {
+    if (!razorpayService.verifySignature(orderId, paymentId, signature)) return false;
+    return razorpayService.isPaymentCaptured(paymentId);
   }
 
   private mapOrder(order: any) {

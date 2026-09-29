@@ -18,3 +18,22 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Response interceptor: graceful handling for auth/permission failures so pages
+// that don't explicitly hide a button still fail clearly instead of silently/ugly.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      localStorage.removeItem('admin_token');
+      if (!window.location.pathname.endsWith('/login')) {
+        window.location.href = '/admin/login';
+      }
+    } else if (status === 403) {
+      const message = error?.response?.data?.message || "You don't have permission to perform this action.";
+      window.dispatchEvent(new CustomEvent('permission-denied', { detail: message }));
+    }
+    return Promise.reject(error);
+  }
+);

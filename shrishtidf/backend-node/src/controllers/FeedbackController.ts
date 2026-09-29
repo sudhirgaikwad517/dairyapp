@@ -14,10 +14,17 @@ export class FeedbackController {
         return res.status(401).json({ success: false, errorCode: 'UNAUTHORIZED', message: 'Not logged in' });
       }
 
-      const { rating, comment } = req.body;
-      const ratingNum = Number(rating);
-      if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
-        return res.status(422).json({ success: false, message: 'Rating must be between 1 and 5' });
+      const { rating, comment, type, subject } = req.body;
+      const feedbackType = type === 'complaint' ? 'complaint' : 'feedback';
+
+      let ratingNum: number | null = null;
+      if (feedbackType === 'feedback') {
+        ratingNum = Number(rating);
+        if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
+          return res.status(422).json({ success: false, message: 'Rating must be between 1 and 5' });
+        }
+      } else if (!comment || !String(comment).trim()) {
+        return res.status(422).json({ success: false, message: 'Please describe your complaint' });
       }
 
       const feedback = await prisma.customer_feedback.create({
@@ -26,14 +33,18 @@ export class FeedbackController {
           customer_id: customer.id,
           rating: ratingNum,
           comment: comment || null,
+          type: feedbackType,
+          subject: subject || null,
           created_at: new Date()
         }
       });
 
       await activityLogService.log({
-        type: 'feedback',
-        title: 'New Feedback',
-        message: `${customer.name || customer.phone} rated ${ratingNum}/5${comment ? `: ${comment}` : '.'}`,
+        type: feedbackType === 'complaint' ? 'complaint' : 'feedback',
+        title: feedbackType === 'complaint' ? 'New Complaint' : 'New Feedback',
+        message: feedbackType === 'complaint'
+          ? `${customer.name || customer.phone} raised a complaint${subject ? ` (${subject})` : ''}: ${comment}`
+          : `${customer.name || customer.phone} rated ${ratingNum}/5${comment ? `: ${comment}` : '.'}`,
         customerId: customer.id
       });
 

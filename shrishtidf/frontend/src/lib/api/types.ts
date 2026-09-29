@@ -8,7 +8,13 @@ export type ProductDto = {
   size: string;
   buyOnce: number;
   subscription: number;
+  mrp?: number;
+  discountPercent?: number;
   badge: string;
+  foodType?: string;
+  inStock?: boolean;
+  stockQuantity?: number;
+  subCategoryId?: string | null;
   imageUrl?: string;
   description?: string;
   specifications?: Record<string, string>;

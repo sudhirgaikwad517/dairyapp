@@ -1,7 +1,8 @@
 import 'package:dairy_app/framework/controller/address/address_controller.dart';
-import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
 import 'package:dairy_app/ui/address/address_screen.dart';
 import 'package:dairy_app/ui/best_sellers/best_sellers_screen.dart';
+import 'package:dairy_app/ui/cart/add_to_cart_sheet.dart';
+import 'package:dairy_app/ui/category/category_products_screen.dart';
 import 'package:dairy_app/ui/menu/menu_screen.dart';
 import 'package:dairy_app/ui/products/product_details_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
@@ -16,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:dairy_app/framework/controller/wallet/wallet_controller.dart';
 import 'package:dairy_app/framework/provider/banner/banner_provider.dart';
 import 'package:dairy_app/framework/provider/catalog/catalog_provider.dart';
 import 'package:dairy_app/framework/repository/cart/product_model.dart';
@@ -34,6 +36,7 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
     Future.microtask(() {
       ref.read(catalogNotifierProvider.notifier).fetchCatalog();
       ref.read(bannerNotifierProvider.notifier).fetchBanners();
+      ref.read(walletProvider).loadWallet();
     });
   }
 
@@ -70,7 +73,11 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 24),
 
                     /// Best Sellers
-                    _buildSectionHeader(title: "Best Sellers", navTitle: "View All"),
+                    _buildSectionHeader(
+                      title: "Best Sellers",
+                      navTitle: "View All",
+                      filter: (p) => p.isPopular,
+                    ),
                     const SizedBox(height: 16),
                     _buildHorizontalProductList(
                       catalogState.products.where((p) => p.isPopular).toList(),
@@ -85,7 +92,11 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 24),
 
                     /// New Arrivals
-                    _buildSectionHeader(title: "New Arrivals", navTitle: "View All"),
+                    _buildSectionHeader(
+                      title: "New Arrivals",
+                      navTitle: "View All",
+                      filter: (p) => p.isNewArrival,
+                    ),
                     const SizedBox(height: 16),
                     _buildHorizontalProductList(
                       catalogState.products.where((p) => p.isNewArrival).toList(),
@@ -95,7 +106,11 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 24),
 
                     /// Seasonal Products
-                    _buildSectionHeader(title: "Seasonal Products", navTitle: "View All"),
+                    _buildSectionHeader(
+                      title: "Seasonal Products",
+                      navTitle: "View All",
+                      filter: (p) => p.isSeasonal,
+                    ),
                     const SizedBox(height: 16),
                     _buildHorizontalProductList(
                       catalogState.products.where((p) => p.isSeasonal).toList(),
@@ -192,7 +207,7 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(width: 6),
                   CommonText(
-                    data: "${AppConstants.currency}0",
+                    data: "${AppConstants.currency}${ref.watch(walletProvider).balance.toStringAsFixed(0)}",
                     style: TextStyles.bold.copyWith(
                       color: AppColors.clrWhiteFFFFFF,
                       fontSize: 12,
@@ -305,7 +320,11 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSectionHeader({required String title, required String navTitle}) {
+  Widget _buildSectionHeader({
+    required String title,
+    required String navTitle,
+    bool Function(ProductModel product)? filter,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppConstants.defaultPadding,
@@ -320,18 +339,22 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
               color: AppColors.clr101828,
             ),
           ),
-          if(navTitle.isNotEmpty || navTitle != '')
+          if (navTitle.isNotEmpty)
             GestureDetector(
-              onTap: (){
+              onTap: () {
+                // Each row opens its own list — every "View All" used to land
+                // on Best Sellers regardless of which section was tapped.
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context)=>BestSellers())
+                  MaterialPageRoute(
+                    builder: (context) => BestSellers(title: title, filter: filter),
+                  ),
                 );
               },
               child: CommonText(
                 data: navTitle,
                 style: TextStyles.bold.copyWith(
-                  fontSize: 18,
-                  color: AppColors.clr101828,
+                  fontSize: 15,
+                  color: AppColors.clr6156F1,
                 ),
               ),
             )
@@ -369,7 +392,17 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final category = categories[index];
-          return Column(
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CategoryProductsScreen(
+                  categoryId: category.id,
+                  categoryLabel: category.label,
+                ),
+              ),
+            ),
+            child: Column(
             children: [
               CommonContainer(
                 height: 100,
@@ -412,6 +445,7 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ],
+            ),
           );
         },
       ),
@@ -520,27 +554,22 @@ class _HomeScreenConsumerState extends ConsumerState<HomeScreen> {
                               color: AppColors.clr101828,
                             ),
                           ),
-                          CommonText(
-                            data:
-                                "${AppConstants.currency}${product.originalPrice.toInt()}",
-                            style: TextStyles.regular.copyWith(
-                              fontSize: 12,
-                              color: AppColors.clrGrey757575,
-                              decoration: TextDecoration.lineThrough,
+                          // Only show a struck-through price when there is a
+                          // real MRP behind it.
+                          if (product.hasMrp)
+                            CommonText(
+                              data:
+                                  "${AppConstants.currency}${product.mrp.toInt()}",
+                              style: TextStyles.regular.copyWith(
+                                fontSize: 12,
+                                color: AppColors.clrGrey757575,
+                                decoration: TextDecoration.lineThrough,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       CommonButton(
-                        onTap: () {
-                          ref.read(cartProvider).addToCart(product);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("${product.name} added to cart"),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        },
+                        onTap: () => showAddToCartSheet(context, product),
                         buttonText: "Add +",
                         buttonColor: AppColors.clr101828,
                         height: 32,

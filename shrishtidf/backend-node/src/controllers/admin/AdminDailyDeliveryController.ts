@@ -2,18 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../../db/prisma';
 import crypto from 'crypto';
 import { formatDateOnly } from '../../services/CutoffService';
-
-function addFrequencyDays(date: Date, frequency: string): Date {
-  const days = frequency === 'weekly' ? 7 : frequency === 'alternate_days' || frequency === 'alternate' ? 2 : 1;
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function parseDateOnly(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
+import { addFrequencyDays, parseDateOnly, parseDayWiseDays, subscriptionLifecycleService } from '../../services/SubscriptionLifecycleService';
 
 function mapRow(row: any) {
   return {
@@ -61,10 +50,29 @@ export class AdminDailyDeliveryController {
         onlyUnmarked
           ? Promise.resolve([])
           : prisma.subscriptions.findMany({
-              where: { status: 'active', next_delivery_date: targetDate, customers: customerWhere },
+              where: { status: 'active', next_delivery_date: { lte: targetDate }, customers: customerWhere },
               include: { customers: { include: { hubs: true, delivery_boys: true } }, products: true, product_variants: true }
             })
       ]);
+
+      // Candidates include anything overdue (next_delivery_date <= target), because a
+      // subscription can be "stuck" behind a vacation window or an unpromoted pending
+      // change — resolve() below fast-forwards/promotes it and tells us whether it
+      // actually lands on the target date.
+      const resolvedSubscriptions: any[] = [];
+      for (let s of dueSubscriptions) {
+        const promoted = await subscriptionLifecycleService.promotePendingIfDue(s as any, dateStr);
+        if (promoted) {
+          s = await prisma.subscriptions.findUnique({
+            where: { id: s.id },
+            include: { customers: { include: { hubs: true, delivery_boys: true } }, products: true, product_variants: true }
+          }) as any;
+        }
+        const finalDueDate = await subscriptionLifecycleService.skipVacationDays(s as any, dateStr);
+        if (finalDueDate && formatDateOnly(finalDueDate) === dateStr) {
+          resolvedSubscriptions.push({ ...s, next_delivery_date: finalDueDate });
+        }
+      }
 
       const rows: any[] = [];
 
@@ -95,7 +103,7 @@ export class AdminDailyDeliveryController {
       }
 
       const alreadyMarkedSubIds = new Set(existingRecords.map((r: any) => r.subscription_id));
-      for (const s of dueSubscriptions) {
+      for (const s of resolvedSubscriptions) {
         if (alreadyMarkedSubIds.has(s.id)) continue;
         const c: any = s.customers;
         rows.push({
@@ -140,13 +148,24 @@ export class AdminDailyDeliveryController {
 
       const saved = [];
       for (const d of deliveries) {
-        const subscription = await prisma.subscriptions.findUnique({ where: { id: d.subscriptionId } });
+        const subscription = await prisma.subscriptions.findUnique({
+          where: { id: d.subscriptionId },
+          include: { customers: true }
+        });
         if (!subscription) continue;
 
         const quantityOrdered = Number(d.quantityOrdered ?? subscription.quantity);
         const quantityDelivered = Number(d.quantityDelivered ?? quantityOrdered);
         const pendingQty = quantityOrdered - quantityDelivered;
         const status = quantityDelivered > 0 ? 'delivered' : 'not_delivered';
+
+        // Postpaid customers pay per delivery, not upfront — need the
+        // previously-billed quantity so re-saving a corrected delivery bills
+        // only the difference instead of charging the same day twice.
+        const existingRecord = await prisma.delivery_records.findUnique({
+          where: { subscription_id_delivery_date: { subscription_id: d.subscriptionId, delivery_date: targetDate } }
+        });
+        const previouslyDelivered = existingRecord ? Number(existingRecord.quantity_delivered) : 0;
 
         const record = await prisma.delivery_records.upsert({
           where: { subscription_id_delivery_date: { subscription_id: d.subscriptionId, delivery_date: targetDate } },
@@ -185,8 +204,43 @@ export class AdminDailyDeliveryController {
         if (subscription.next_delivery_date && formatDateOnly(new Date(subscription.next_delivery_date)) === date) {
           await prisma.subscriptions.update({
             where: { id: subscription.id },
-            data: { next_delivery_date: addFrequencyDays(targetDate, subscription.frequency) }
+            data: { next_delivery_date: addFrequencyDays(targetDate, subscription.frequency, parseDayWiseDays(subscription.day_wise_days)) }
           });
+        }
+
+        // Postpaid billing: charge the wallet for exactly what was actually
+        // delivered, the moment it's marked. A prepaid plan already paid for
+        // every delivery upfront, so it never touches the wallet here.
+        if (subscription.wallet_auto_debit && subscription.customers?.customer_type === 'postpaid') {
+          const deltaQty = quantityDelivered - previouslyDelivered;
+          const deltaAmount = deltaQty * Number(subscription.rate || 0);
+          if (deltaAmount !== 0) {
+            const wallet = await prisma.customer_wallets.upsert({
+              where: { customer_id: subscription.customer_id },
+              update: { updated_at: now },
+              create: { id: crypto.randomUUID(), customer_id: subscription.customer_id, balance: 0, created_at: now, updated_at: now }
+            });
+            // Postpaid is allowed to go negative — that running due is the point.
+            const newBalance = Number(wallet.balance) - deltaAmount;
+            await prisma.customer_wallets.update({
+              where: { customer_id: subscription.customer_id },
+              data: { balance: newBalance, updated_at: now }
+            });
+            await prisma.wallet_transactions.create({
+              data: {
+                id: crypto.randomUUID(),
+                customer_id: subscription.customer_id,
+                type: deltaAmount > 0 ? 'debit' : 'credit',
+                amount: Math.abs(deltaAmount),
+                balance_after: newBalance,
+                reference_type: 'subscription_delivery',
+                reference_id: record.id,
+                notes: `${deltaAmount > 0 ? 'Delivery charge' : 'Delivery correction'}: ${quantityDelivered} unit(s) on ${date}`,
+                created_at: now,
+                updated_at: now
+              }
+            });
+          }
         }
 
         saved.push(record.id);
@@ -202,11 +256,41 @@ export class AdminDailyDeliveryController {
   public async unmark(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const record = await prisma.delivery_records.findUnique({ where: { id }, include: { subscriptions: true } });
+      const record = await prisma.delivery_records.findUnique({
+        where: { id },
+        include: { subscriptions: { include: { customers: true } } }
+      });
       if (!record) return res.status(404).json({ success: false, message: 'Delivery record not found' });
 
       const recordDateStr = formatDateOnly(new Date(record.delivery_date));
       const sub = record.subscriptions;
+      const now = new Date();
+
+      // A postpaid delivery that was already billed refunds that charge —
+      // unmarking means it never happened, so the customer shouldn't be
+      // left paying for it.
+      if (sub.wallet_auto_debit && sub.customers?.customer_type === 'postpaid') {
+        const billed = Number(record.quantity_delivered) * Number(sub.rate || 0);
+        if (billed !== 0) {
+          const wallet = await prisma.customer_wallets.findUnique({ where: { customer_id: sub.customer_id } });
+          const newBalance = Number(wallet?.balance || 0) + billed;
+          await prisma.customer_wallets.update({ where: { customer_id: sub.customer_id }, data: { balance: newBalance, updated_at: now } });
+          await prisma.wallet_transactions.create({
+            data: {
+              id: crypto.randomUUID(),
+              customer_id: sub.customer_id,
+              type: 'credit',
+              amount: billed,
+              balance_after: newBalance,
+              reference_type: 'subscription_delivery',
+              reference_id: record.id,
+              notes: `Delivery unmarked, charge reversed: ${recordDateStr}`,
+              created_at: now,
+              updated_at: now
+            }
+          });
+        }
+      }
 
       await prisma.delivery_records.delete({ where: { id } });
 

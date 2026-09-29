@@ -35,11 +35,25 @@ export class CartController {
       
       return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
-      if (error.message === 'PRODUCT_NOT_FOUND') {
+      if (error.message === 'PRODUCT_NOT_FOUND' || error.message === 'VARIANT_NOT_FOUND') {
         return res.status(404).json({
           success: false,
           errorCode: 'NOT_FOUND',
           message: 'Product not found'
+        });
+      }
+      if (error.message === 'OUT_OF_STOCK') {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'OUT_OF_STOCK',
+          message: 'This item is out of stock right now.'
+        });
+      }
+      if (error.message === 'PRODUCT_UNAVAILABLE') {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'PRODUCT_UNAVAILABLE',
+          message: 'This item is no longer available.'
         });
       }
       console.error(error);
@@ -48,6 +62,43 @@ export class CartController {
         errorCode: 'CART_ERROR',
         message: 'Unable to add item to cart'
       });
+    }
+  }
+
+  public async updateItem(req: Request, res: Response) {
+    try {
+      const sessionId = req.headers['session-id'] as string || req.cookies?.session_id || 'default-session';
+      const itemId = req.params.itemId as string;
+      const { quantity } = req.body;
+
+      if (typeof quantity !== 'number') {
+        return res.status(422).json({ success: false, message: 'Quantity is required' });
+      }
+
+      const result = await cartService.updateCartItemQuantity(sessionId, itemId, quantity);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      if (error.message === 'CART_NOT_FOUND') {
+        return res.status(404).json({ success: false, errorCode: 'NOT_FOUND', message: 'Cart not found' });
+      }
+      console.error(error);
+      return res.status(500).json({ success: false, errorCode: 'CART_ERROR', message: 'Unable to update cart item' });
+    }
+  }
+
+  public async destroyItem(req: Request, res: Response) {
+    try {
+      const sessionId = req.headers['session-id'] as string || req.cookies?.session_id || 'default-session';
+      const itemId = req.params.itemId as string;
+
+      const result = await cartService.removeCartItem(sessionId, itemId);
+      return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+      if (error.message === 'CART_NOT_FOUND') {
+        return res.status(404).json({ success: false, errorCode: 'NOT_FOUND', message: 'Cart not found' });
+      }
+      console.error(error);
+      return res.status(500).json({ success: false, errorCode: 'CART_ERROR', message: 'Unable to remove cart item' });
     }
   }
 

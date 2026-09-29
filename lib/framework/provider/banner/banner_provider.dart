@@ -1,3 +1,4 @@
+import 'package:dairy_app/framework/dependency_injection/inject.dart';
 import 'package:dairy_app/framework/repository/banner/banner_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -30,7 +31,7 @@ class BannerNotifier extends Notifier<BannerState> {
 
   @override
   BannerState build() {
-    _repository = BannerRepository();
+    _repository = getIt<BannerRepository>();
     return BannerState(
       topBanners: [],
       secondBannerVideo: '',

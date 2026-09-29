@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -45,7 +45,7 @@ export default function DispatchSheet() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {routes.map((route) => (
+        {routes.map((route: any) => (
           <Card key={route.id} className="relative overflow-hidden group">
             {/* Subtle glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -68,7 +68,7 @@ export default function DispatchSheet() {
                   <span>Qty</span>
                 </div>
                 
-                {route.items.map((item, idx) => (
+                {route.items.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-800">{item.name}</span>

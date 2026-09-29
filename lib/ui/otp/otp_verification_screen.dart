@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pinput/pinput.dart';
 import 'package:dairy_app/framework/provider/auth_provider.dart';
+import 'package:dairy_app/ui/registration/registration_screen.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   const OtpVerificationScreen({super.key});
@@ -24,7 +25,6 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
   @override
   Widget build(BuildContext context) {
     final watchOtpVerificationProvider = ref.watch(otpVerificationProvider);
-    final size = MediaQuery.of(context).size;
 
     final defaultPinTheme = PinTheme(
       width: 70,
@@ -158,8 +158,18 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
 
                                 /// Resend Button
                                 GestureDetector(
-                                  onTap: () {
-                                    // Handle resend
+                                  onTap: () async {
+                                    final phone = ref.read(authNotifierProvider).phone;
+                                    if (phone == null) return;
+                                    final sent = await ref.read(authNotifierProvider.notifier).sendOtp(phone);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(sent ? 'OTP resent' : (ref.read(authNotifierProvider).error ?? 'Unable to resend OTP')),
+                                        behavior: SnackBarBehavior.floating,
+                                        backgroundColor: sent ? AppColors.clr6156F1 : Colors.redAccent,
+                                      ),
+                                    );
                                   },
                                   child: CommonText(
                                     data: "RESEND NEW CODE",
@@ -234,10 +244,13 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
                                               const SizedBox(height: 32),
                                               CommonButton(
                                                 onTap: () {
+                                                  final isNewUser = ref.read(authNotifierProvider).isNewUser;
                                                   Navigator.pushAndRemoveUntil(
                                                     context,
-                                                    MaterialPageRoute(builder: (context) => const BaseScreen()),
-                                                    ModalRoute.withName('/'),
+                                                    MaterialPageRoute(
+                                                      builder: (context) => isNewUser ? const RegistrationScreen() : const BaseScreen(),
+                                                    ),
+                                                    (route) => false,
                                                   );
                                                 },
                                                 buttonText: "Done",

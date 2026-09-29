@@ -32,6 +32,7 @@ export const API_ROUTES = {
   products: "/api/v1/products",
   productById: (id: string) => `/api/v1/products/${id}`,
   categories: "/api/v1/categories",
+  categoryById: (id: string) => `/api/v1/categories/${id}`,
   contact: "/api/v1/contact",
   cart: "/api/v1/cart",
   cartItem: (id: string) => `/api/v1/cart/items/${id}`,
@@ -58,6 +59,7 @@ export const API_ROUTES = {
   subscriptionPause: (id: string) => `/api/v1/subscriptions/${id}/pause`,
   subscriptionResume: (id: string) => `/api/v1/subscriptions/${id}/resume`,
   subscriptionCancel: (id: string) => `/api/v1/subscriptions/${id}/cancel`,
+  subscriptionChangeRequest: (id: string) => `/api/v1/subscriptions/${id}/change-request`,
 } as const;
 
 function meta(): ApiMeta {

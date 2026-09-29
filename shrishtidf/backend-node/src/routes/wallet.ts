@@ -1,1 +1,9 @@
-﻿import { Router } from 'express'; import { walletController } from '../controllers/WalletController'; const router = Router(); router.get('/', walletController.show.bind(walletController)); router.post('/topup', walletController.topUp.bind(walletController)); export default router;
+﻿import { Router } from 'express';
+import { walletController } from '../controllers/WalletController';
+
+const router = Router();
+router.get('/', walletController.show.bind(walletController));
+router.post('/topup', walletController.topUp.bind(walletController));
+router.post('/cash-request', walletController.requestCash.bind(walletController));
+
+export default router;

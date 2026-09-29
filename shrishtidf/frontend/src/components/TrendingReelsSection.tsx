@@ -146,7 +146,7 @@ export function TrendingReelsSection({
             <ReelCard
               key={product.id}
               product={product}
-              href={`/products?category=${encodeURIComponent(categoryId)}`}
+              href={`/category/${encodeURIComponent(categoryId)}`}
             />
           ))}
         </div>

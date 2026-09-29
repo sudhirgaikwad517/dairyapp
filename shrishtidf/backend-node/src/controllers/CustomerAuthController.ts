@@ -9,7 +9,7 @@ export class CustomerAuthController {
         return res.status(422).json({ success: false, message: 'Invalid phone number' });
       }
 
-      const payload = customerAuthService.sendOtp(phone);
+      const payload = await customerAuthService.sendOtp(phone);
       return res.status(200).json({ success: true, data: payload });
     } catch (error: any) {
       if (error.message === 'INVALID_PHONE') {
@@ -41,8 +41,8 @@ export class CustomerAuthController {
         return res.status(401).json({ success: false, message: 'Missing session ID' });
       }
 
-      const customer = await customerAuthService.verifyOtp(phone, otp, sessionId);
-      return res.status(200).json({ success: true, data: { customer } });
+      const { customer, isNewUser } = await customerAuthService.verifyOtp(phone, otp, sessionId);
+      return res.status(200).json({ success: true, data: { customer, isNewUser } });
     } catch (error: any) {
       if (error.message === 'INVALID_OTP') {
         return res.status(422).json({
@@ -114,7 +114,7 @@ export class CustomerAuthController {
     try {
       const sessionId = req.headers['session-id'] as string || req.cookies?.session_id;
       if (sessionId) {
-        customerAuthService.logout(sessionId);
+        await customerAuthService.logout(sessionId);
       }
       return res.status(200).json({ success: true, data: { loggedOut: true } });
     } catch (error) {

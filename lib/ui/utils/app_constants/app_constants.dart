@@ -21,6 +21,11 @@ class AppConstants {
   static AppConstants constant = AppConstants._();
 
   static const appName = 'Dairy App';
+
+  /// The customer-facing brand name shown in the UI (splash/menu footer,
+  /// "Verified by…" badges, etc.) — distinct from [appName], which is the
+  /// generic package/app title.
+  static const brandName = 'Sonu Ka Doodh';
   static const theta = 'θ';
   static const xAuthToken = 'X-Auth-Token';
   static WidgetRef? globalRef;

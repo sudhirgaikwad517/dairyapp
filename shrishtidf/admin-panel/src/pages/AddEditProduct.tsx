@@ -10,6 +10,10 @@ import { api } from '../lib/api';
 
 const PRODUCT_TYPES = ['Liquid', 'Solid', 'Powder', 'Other'];
 
+/// Must stay in sync with PRODUCT_BADGES in the backend's ProductService —
+/// the app styles each tag, so anything else is dropped on save.
+const PRODUCT_BADGES = ['Must Try', 'New', 'Popular', 'Best Value', 'Combo', 'Seasonal'];
+
 type VariantRow = {
   id?: string;
   city: string;
@@ -17,6 +21,10 @@ type VariantRow = {
   ltrs: string;
   packets: string;
   rate: string;
+  /// Independent from `rate` — a subscribing customer can pay a different
+  /// (usually lower) price per delivery than a one-off Buy Once order.
+  /// Left blank it mirrors `rate`, same as before this field existed.
+  subscriptionRate: string;
   mrpEcom: string;
   bottleApplicable: boolean;
   pouchApplicable: boolean;
@@ -26,7 +34,7 @@ type VariantRow = {
 };
 
 const emptyVariant: VariantRow = {
-  city: '', packaging: '', ltrs: '', packets: '1', rate: '', mrpEcom: '',
+  city: '', packaging: '', ltrs: '', packets: '1', rate: '', subscriptionRate: '', mrpEcom: '',
   bottleApplicable: false, pouchApplicable: false, stockQuantity: '100',
   webVisibility: true, appVisibility: true
 };
@@ -34,6 +42,7 @@ const emptyVariant: VariantRow = {
 const emptyForm = {
   categoryId: '', subCategoryId: '', productType: '', name: '', shortCode: '',
   discount: '0', gstRate: '0', description: '', hsnCode: '', imageUrl: '',
+  mrp: '0', badge: '', foodType: 'veg', isActive: true,
   prepaidGetonce: true, prepaidSubscribe: true, postpaidGetonce: true, postpaidSubscribe: true
 };
 
@@ -44,6 +53,60 @@ function Field({ label, required, children }: { label: string; required?: boolea
         {label}{required && <span className="text-red-600 ml-0.5">*</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+/// Mirrors the category-products row in the mobile app, so whoever fills this
+/// form can see exactly what the customer will see before saving.
+function AppRowPreview({ form, variant }: { form: typeof emptyForm; variant?: VariantRow }) {
+  const price = Number(variant?.rate || 0);
+  const subscribePrice = Number(variant?.subscriptionRate || variant?.rate || 0);
+  const mrp = Math.max(Number(form.mrp || 0), Number(variant?.mrpEcom || 0));
+  const showMrp = mrp > price;
+  const showSubscribeMrp = mrp > subscribePrice;
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 min-w-0">
+      <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0">In app</span>
+      <div className="h-10 w-10 shrink-0 rounded-md bg-gray-100 overflow-hidden">
+        {form.imageUrl
+          ? <img src={form.imageUrl} alt="" className="h-full w-full object-cover" />
+          : null}
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-gray-900 truncate">
+            {form.name || 'Product name'}
+          </span>
+          <span
+            className={`inline-flex h-3 w-3 shrink-0 items-center justify-center border ${
+              form.foodType === 'non_veg' ? 'border-red-600' : 'border-green-600'
+            }`}
+            title={form.foodType === 'non_veg' ? 'Non-Veg' : 'Veg'}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${form.foodType === 'non_veg' ? 'bg-red-600' : 'bg-green-600'}`} />
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+          <span className="text-gray-500">{variant?.packaging || 'size'}</span>
+          <span title="Buy Once">
+            <span className="font-semibold text-gray-900">₹{price || 0}</span>
+            {showMrp && <span className="ml-1 text-gray-400 line-through">₹{mrp}</span>}
+          </span>
+          {(form.prepaidSubscribe || form.postpaidSubscribe) && (
+            <span title="Subscribe" className="text-blue-700">
+              Sub ₹{subscribePrice || 0}
+              {showSubscribeMrp && <span className="ml-1 text-gray-400 line-through">₹{mrp}</span>}
+            </span>
+          )}
+        </div>
+      </div>
+      {form.badge && (
+        <span className="ml-auto shrink-0 rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-semibold text-gray-900">
+          {form.badge}
+        </span>
+      )}
     </div>
   );
 }
@@ -90,6 +153,10 @@ export default function AddEditProduct() {
         description: p.description || '',
         hsnCode: p.hsn_code || '',
         imageUrl: p.image_url || '',
+        mrp: String(p.mrp ?? 0),
+        badge: p.badge || '',
+        foodType: p.food_type || 'veg',
+        isActive: p.is_active !== false,
         prepaidGetonce: p.prepaid_getonce !== false,
         prepaidSubscribe: p.prepaid_subscribe !== false,
         postpaidGetonce: p.postpaid_getonce !== false,
@@ -103,6 +170,7 @@ export default function AddEditProduct() {
           ltrs: v.ltrs !== null && v.ltrs !== undefined ? String(v.ltrs) : '',
           packets: String(v.packets ?? 1),
           rate: String(v.buy_once ?? 0),
+          subscriptionRate: String(v.subscription ?? v.buy_once ?? 0),
           mrpEcom: String(v.mrp_ecom ?? 0),
           bottleApplicable: !!v.bottle_applicable,
           pouchApplicable: !!v.pouch_applicable,
@@ -150,6 +218,19 @@ export default function AddEditProduct() {
       setError('Each product detail row needs a city, packaging and rate.');
       return;
     }
+    // An MRP at or below the selling price is never shown, so flag it here
+    // rather than letting it silently disappear from the app.
+    const rate = Number(variants[0]?.rate || 0);
+    const mrp = Number(form.mrp || 0);
+    if (mrp > 0 && mrp <= rate) {
+      setError('MRP must be higher than the product rate, otherwise leave it as 0.');
+      return;
+    }
+    const badRow = variants.find((v) => Number(v.mrpEcom || 0) > 0 && Number(v.mrpEcom) <= Number(v.rate || 0));
+    if (badRow) {
+      setError(`MRP (Ecom Order) for ${badRow.city || 'a city row'} must be higher than its rate, otherwise leave it as 0.`);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -164,6 +245,10 @@ export default function AddEditProduct() {
         description: form.description || undefined,
         hsnCode: form.hsnCode || undefined,
         imageUrl: form.imageUrl || undefined,
+        mrp: Number(form.mrp || 0),
+        badge: form.badge,
+        foodType: form.foodType,
+        isActive: form.isActive,
         prepaidGetonce: form.prepaidGetonce,
         prepaidSubscribe: form.prepaidSubscribe,
         postpaidGetonce: form.postpaidGetonce,
@@ -176,6 +261,9 @@ export default function AddEditProduct() {
           ltrs: v.ltrs === '' ? undefined : Number(v.ltrs),
           packets: Number(v.packets || 1),
           rate: Number(v.rate || 0),
+          // Blank means "same as Buy Once" — never silently 0 a subscription
+          // price the admin just hasn't touched yet.
+          subscriptionRate: v.subscriptionRate === '' ? Number(v.rate || 0) : Number(v.subscriptionRate || 0),
           mrpEcom: Number(v.mrpEcom || 0),
           bottleApplicable: v.bottleApplicable,
           pouchApplicable: v.pouchApplicable,
@@ -261,6 +349,25 @@ export default function AddEditProduct() {
             <Field label="Main Product Image URL">
               <Input value={form.imageUrl} onChange={setField('imageUrl')} placeholder="https://..." />
             </Field>
+            <Field label="MRP (struck-through price)">
+              <Input type="number" value={form.mrp} onChange={setField('mrp')} placeholder="0 = don't show one" />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Shown crossed out next to the selling price. Leave 0 to show only the selling price.
+                A row&apos;s own &ldquo;MRP (Ecom Order)&rdquo; below overrides this.
+              </p>
+            </Field>
+            <Field label="Tag">
+              <Select value={form.badge} onChange={setField('badge')}>
+                <option value="">No tag</option>
+                {PRODUCT_BADGES.map((b) => <option key={b} value={b}>{b}</option>)}
+              </Select>
+            </Field>
+            <Field label="Food Type">
+              <Select value={form.foodType} onChange={setField('foodType')}>
+                <option value="veg">Veg</option>
+                <option value="non_veg">Non-Veg</option>
+              </Select>
+            </Field>
             <div className="sm:col-span-2 lg:col-span-3">
               <Field label="Description">
                 <textarea
@@ -270,6 +377,20 @@ export default function AddEditProduct() {
                   onChange={setField('description')}
                 />
               </Field>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                />
+                Visible to customers
+                <span className="text-xs font-normal text-gray-500">
+                  (uncheck to hide from the app & website without deleting it)
+                </span>
+              </label>
+              <AppRowPreview form={form} variant={variants[0]} />
             </div>
           </CardContent>
         </Card>
@@ -374,11 +495,21 @@ export default function AddEditProduct() {
                   <Field label="Packets">
                     <Input type="number" value={v.packets} onChange={(e) => setVariant(index, 'packets', e.target.value)} />
                   </Field>
-                  <Field label="Product Rate (SP)" required>
+                  <Field label="Buy Once Rate (SP)" required>
                     <Input type="number" value={v.rate} onChange={(e) => setVariant(index, 'rate', e.target.value)} required />
+                  </Field>
+                  <Field label="Subscription Rate (SP)">
+                    <Input
+                      type="number"
+                      value={v.subscriptionRate}
+                      onChange={(e) => setVariant(index, 'subscriptionRate', e.target.value)}
+                      placeholder={v.rate || '0'}
+                    />
+                    <p className="text-[11px] text-gray-400 mt-1">Leave blank to match Buy Once.</p>
                   </Field>
                   <Field label="MRP (Ecom Order)">
                     <Input type="number" value={v.mrpEcom} onChange={(e) => setVariant(index, 'mrpEcom', e.target.value)} />
+                    <p className="text-[11px] text-gray-400 mt-1">Same MRP is used for both Buy Once and Subscription discounts.</p>
                   </Field>
                   <Field label="Stock Quantity">
                     <Input type="number" value={v.stockQuantity} onChange={(e) => setVariant(index, 'stockQuantity', e.target.value)} />

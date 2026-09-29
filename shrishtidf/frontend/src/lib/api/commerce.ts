@@ -25,6 +25,9 @@ export type SubscriptionItem = {
   nextDeliveryDate: string | null;
   pausedUntil: string | null;
   walletAutoDebit: boolean;
+  hasPendingChange?: boolean;
+  pendingQuantity?: number | null;
+  changeEffectiveDate?: string | null;
 };
 
 export async function fetchWallet(): Promise<WalletSummary | null> {
@@ -94,4 +97,19 @@ export async function cancelSubscription(id: string): Promise<boolean> {
   });
   const json = (await res.json()) as ApiResponse<unknown>;
   return json.success;
+}
+
+export async function requestSubscriptionChange(
+  id: string,
+  changes: { quantity?: number; variantId?: string; frequency?: string }
+): Promise<{ ok: boolean; effectiveFrom?: string; message?: string }> {
+  const res = await fetch(API_ROUTES.subscriptionChangeRequest(id), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    ...fetchOptions,
+    body: JSON.stringify(changes),
+  });
+  const json = (await res.json()) as ApiResponse<{ effectiveFrom: string }>;
+  if (json.success) return { ok: true, effectiveFrom: json.data.effectiveFrom };
+  return { ok: false, message: json.error?.message };
 }

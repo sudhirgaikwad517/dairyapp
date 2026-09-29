@@ -3,7 +3,22 @@ import type { ApiResponse } from "@/lib/api/response";
 import { API_ROUTES } from "@/lib/api/response";
 import type { ProductDto, ProductsListData } from "@/lib/api/types";
 import { DEFAULT_PRODUCT_CATEGORIES } from "@/lib/site-data";
-import type { ProductCategory, ProductItem } from "@/lib/types";
+import type { CategoryDetail, ProductCategory, ProductItem } from "@/lib/types";
+
+/**
+ * Fields the catalog API added for display (real MRP, curated tag, veg mark,
+ * stock). Copied through by every mapper so no screen silently loses them.
+ */
+function displayFields(source: Partial<ProductItem>) {
+  return {
+    mrp: source.mrp,
+    discountPercent: source.discountPercent,
+    foodType: source.foodType,
+    inStock: source.inStock,
+    stockQuantity: source.stockQuantity,
+    subCategoryId: source.subCategoryId,
+  };
+}
 
 export async function getProductsList(): Promise<{
   data: ProductsListData;
@@ -77,6 +92,7 @@ export async function getProductById(id: string): Promise<ProductItem | null> {
         variants: json.data.variants,
         crossSells: json.data.crossSells,
         allowSubscription: json.data.allowSubscription,
+        ...displayFields(json.data),
       };
     }
   } catch {
@@ -104,5 +120,26 @@ export async function getProductById(id: string): Promise<ProductItem | null> {
     reviews: found.reviews,
     categoryId: found.categoryId,
     categoryLabel: found.categoryLabel,
+    ...displayFields(found),
   };
+}
+
+/**
+ * Category header, sub-category filter chips and products in one request.
+ * Returns null when the category doesn't exist or the API is unreachable, so
+ * the page can show "not found" / "try again" instead of an empty grid.
+ */
+export async function getCategoryDetail(
+  categoryId: string,
+  subCategoryId?: string,
+): Promise<CategoryDetail | null> {
+  try {
+    const query = subCategoryId ? `?subCategory=${encodeURIComponent(subCategoryId)}` : "";
+    const res = await fetch(apiUrl(`${API_ROUTES.categoryById(categoryId)}${query}`), fetchOptions);
+    const json = (await res.json()) as ApiResponse<CategoryDetail>;
+    if (json.success) return json.data;
+  } catch {
+    /* fall through */
+  }
+  return null;
 }

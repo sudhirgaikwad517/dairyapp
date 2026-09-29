@@ -21,7 +21,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '1 litre',
       price: 84,
-      originalPrice: 99,
+      mrp: 99,
       category: 'Milk',
       rating: 4.8,
       isPopular: true,
@@ -36,7 +36,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '500 ml',
       price: 38,
-      originalPrice: 45,
+      mrp: 45,
       category: 'Milk',
       rating: 4.6,
       image:
@@ -50,7 +50,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '1 litre',
       price: 58,
-      originalPrice: 65,
+      mrp: 65,
       category: 'Milk',
       rating: 4.4,
       image:
@@ -63,7 +63,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '500 ml',
       price: 995,
-      originalPrice: 1150,
+      mrp: 1150,
       category: 'Ghee',
       rating: 4.9,
       isPopular: true,
@@ -78,7 +78,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '250 ml',
       price: 430,
-      originalPrice: 475,
+      mrp: 475,
       category: 'Ghee',
       rating: 4.7,
       image:
@@ -92,7 +92,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '200 g',
       price: 110,
-      originalPrice: 125,
+      mrp: 125,
       category: 'Paneer',
       rating: 4.8,
       isPopular: true,
@@ -106,7 +106,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '500 g',
       price: 245,
-      originalPrice: 280,
+      mrp: 280,
       category: 'Paneer',
       rating: 4.5,
       image:
@@ -120,7 +120,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '400 g',
       price: 58,
-      originalPrice: 65,
+      mrp: 65,
       category: 'Curd',
       rating: 4.6,
       image:
@@ -133,7 +133,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '200 g',
       price: 80,
-      originalPrice: 95,
+      mrp: 95,
       category: 'Curd',
       rating: 4.7,
       image:
@@ -147,7 +147,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '100 g',
       price: 62,
-      originalPrice: 70,
+      mrp: 70,
       category: 'Butter',
       rating: 4.5,
       image:
@@ -161,7 +161,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '200 g',
       price: 145,
-      originalPrice: 165,
+      mrp: 165,
       category: 'Butter',
       rating: 4.6,
       image:
@@ -175,7 +175,7 @@ class CatalogData {
       brand: 'Daily Dairy',
       volume: '300 ml',
       price: 32,
-      originalPrice: 38,
+      mrp: 38,
       category: 'Beverages',
       rating: 4.4,
       image:
@@ -188,7 +188,7 @@ class CatalogData {
       brand: 'Proshakti',
       volume: '250 ml',
       price: 48,
-      originalPrice: 55,
+      mrp: 55,
       category: 'Beverages',
       rating: 4.5,
       image:

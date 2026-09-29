@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Loader2, LogOut, Mail, MapPin, Package, Phone, User, Wallet } from "lucide-react";
+import { Loader2, LogOut, Mail, MapPin, Minus, Package, Phone, Plus, User, Wallet } from "lucide-react";
 
 import { ContentCard } from "@/components/layout/ContentCard";
 import { PageHero } from "@/components/layout/PageHero";
@@ -13,6 +13,7 @@ import {
   fetchSubscriptions,
   fetchWallet,
   pauseSubscription,
+  requestSubscriptionChange,
   resumeSubscription,
   topUpWallet,
   type SubscriptionItem,
@@ -78,6 +79,9 @@ export function AccountPage() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [changeQtyDrafts, setChangeQtyDrafts] = useState<Record<string, number>>({});
+  const [changeSavingId, setChangeSavingId] = useState<string | null>(null);
+  const [changeMessage, setChangeMessage] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -452,29 +456,83 @@ export function AccountPage() {
             <p className="text-sm text-muted-foreground">No active subscriptions. Add subscription items from product pages.</p>
           ) : (
             <ul className="space-y-3">
-              {subscriptions.map((sub) => (
-                <li key={sub.id} className="rounded-xl border border-border p-3 text-sm">
-                  <div className="font-semibold">{sub.productName} · {sub.sizeLabel}</div>
-                  <div className="text-xs text-muted-foreground capitalize">{sub.frequency} · {sub.status}</div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {sub.status === "active" && (
-                      <button type="button" className="text-xs text-primary font-semibold" onClick={async () => { await pauseSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
-                        Pause (vacation)
-                      </button>
-                    )}
-                    {sub.status === "paused" && (
-                      <button type="button" className="text-xs text-primary font-semibold" onClick={async () => { await resumeSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
-                        Resume
-                      </button>
+              {subscriptions.map((sub) => {
+                const draftQty = changeQtyDrafts[sub.id] ?? sub.quantity;
+                const dirty = draftQty !== sub.quantity;
+                return (
+                  <li key={sub.id} className="rounded-xl border border-border p-3 text-sm">
+                    <div className="font-semibold">{sub.productName} · {sub.sizeLabel}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{sub.frequency} · {sub.status}</div>
+                    {sub.hasPendingChange && (
+                      <p className="text-xs text-primary mt-1">
+                        Quantity change to {sub.pendingQuantity} takes effect {sub.changeEffectiveDate ? formatDate(sub.changeEffectiveDate) : "soon"}.
+                      </p>
                     )}
                     {sub.status !== "cancelled" && (
-                      <button type="button" className="text-xs text-destructive font-semibold" onClick={async () => { await cancelSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
-                        Cancel
-                      </button>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-muted-foreground">Qty</span>
+                        <button
+                          type="button"
+                          className="h-6 w-6 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+                          disabled={draftQty <= 1}
+                          onClick={() => setChangeQtyDrafts((d) => ({ ...d, [sub.id]: Math.max(1, draftQty - 1) }))}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-5 text-center font-semibold">{draftQty}</span>
+                        <button
+                          type="button"
+                          className="h-6 w-6 rounded-full border border-border flex items-center justify-center"
+                          onClick={() => setChangeQtyDrafts((d) => ({ ...d, [sub.id]: draftQty + 1 }))}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                        {dirty && (
+                          <button
+                            type="button"
+                            disabled={changeSavingId === sub.id}
+                            className="text-xs font-semibold text-primary ml-1"
+                            onClick={async () => {
+                              setChangeSavingId(sub.id);
+                              const result = await requestSubscriptionChange(sub.id, { quantity: draftQty });
+                              setChangeSavingId(null);
+                              setChangeMessage((m) => ({
+                                ...m,
+                                [sub.id]: result.ok
+                                  ? `Saved — new quantity applies from ${result.effectiveFrom}.`
+                                  : result.message || "Unable to save change.",
+                              }));
+                              setSubscriptions(await fetchSubscriptions());
+                            }}
+                          >
+                            {changeSavingId === sub.id ? "Saving..." : "Save"}
+                          </button>
+                        )}
+                      </div>
                     )}
-                  </div>
-                </li>
-              ))}
+                    {changeMessage[sub.id] && (
+                      <p className="text-xs text-muted-foreground mt-1">{changeMessage[sub.id]}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {sub.status === "active" && (
+                        <button type="button" className="text-xs text-primary font-semibold" onClick={async () => { await pauseSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
+                          Pause (vacation)
+                        </button>
+                      )}
+                      {sub.status === "paused" && (
+                        <button type="button" className="text-xs text-primary font-semibold" onClick={async () => { await resumeSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
+                          Resume
+                        </button>
+                      )}
+                      {sub.status !== "cancelled" && (
+                        <button type="button" className="text-xs text-destructive font-semibold" onClick={async () => { await cancelSubscription(sub.id); setSubscriptions(await fetchSubscriptions()); }}>
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </ContentCard>

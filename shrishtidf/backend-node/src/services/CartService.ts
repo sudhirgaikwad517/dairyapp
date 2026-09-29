@@ -21,9 +21,32 @@ export class CartService {
   }
 
   public async addCartItem(sessionId: string, productId: string, purchaseType = 'BUY_ONCE', quantity = 1, variantId: string | null = null) {
-    const product = await prisma.products.findUnique({ where: { id: productId } });
+    const product = await prisma.products.findUnique({
+      where: { id: productId },
+      include: { product_variants: true }
+    });
     if (!product) {
       throw new Error('PRODUCT_NOT_FOUND');
+    }
+
+    // The app and website already hide these, but the API is reachable
+    // directly — a hidden or sold-out product must not enter a cart.
+    if (!product.is_active) {
+      throw new Error('PRODUCT_UNAVAILABLE');
+    }
+
+    const variant = variantId
+      ? product.product_variants.find((v) => v.id === variantId)
+      : product.product_variants.find((v) => v.is_default) || product.product_variants[0];
+
+    if (variantId && !variant) {
+      throw new Error('VARIANT_NOT_FOUND');
+    }
+    if (variant && (variant.out_of_stock || variant.stock_quantity <= 0)) {
+      throw new Error('OUT_OF_STOCK');
+    }
+    if (!variant && product.stock_quantity <= 0) {
+      throw new Error('OUT_OF_STOCK');
     }
 
     return await prisma.$transaction(async (tx) => {
@@ -172,6 +195,7 @@ export class CartService {
       variantId: variant?.id || null,
       name: product.name,
       size: variant?.size_label || product.size,
+      imageUrl: product.image_url,
       categoryLabel: product.product_categories?.label,
       badge: product.badge || '',
       quantity: item.quantity,

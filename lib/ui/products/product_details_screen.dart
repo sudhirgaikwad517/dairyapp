@@ -1,5 +1,6 @@
 import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
 import 'package:dairy_app/framework/repository/cart/product_model.dart';
+import 'package:dairy_app/ui/subscription/subscribe_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
 import 'package:dairy_app/ui/utils/theme/text_styles.dart';
@@ -14,9 +15,7 @@ class ProductDetailsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
-    final quantity = cart.cartItems
-        .where((item) => item.id == product.id)
-        .fold<int>(0, (total, item) => total + item.quantity);
+    final quantity = cart.quantityOfProduct(product.id);
 
     return Scaffold(
       backgroundColor: AppColors.clrF7F7F7,
@@ -77,30 +76,68 @@ class ProductDetailsScreen extends ConsumerWidget {
         minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         child: SizedBox(
           height: 52,
-          child: FilledButton.icon(
-            onPressed: () {
-              ref.read(cartProvider).addToCart(product);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${product.name} added to cart'),
-                  duration: const Duration(seconds: 1),
+          child: Row(
+            children: [
+              if (product.inStock && product.allowSubscription) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => SubscribeScreen(product: product)),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.clr6156F1,
+                      side: const BorderSide(color: AppColors.clr6156F1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.autorenew_rounded, size: 18),
+                    label: const Text('Subscribe'),
+                  ),
                 ),
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.clr6156F1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: (product.inStock && product.allowSubscription) ? 1 : 2,
+                child: FilledButton.icon(
+                  onPressed: product.inStock
+                      ? () async {
+                          final error = await ref.read(cartProvider).addToCart(product);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(error ?? '${product.name} added to cart'),
+                                backgroundColor:
+                                    error == null ? null : AppColors.clrRedD32F2F,
+                                duration: Duration(seconds: error == null ? 1 : 3),
+                              ),
+                            );
+                        }
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.clr6156F1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: Icon(
+                    product.inStock
+                        ? (quantity > 0
+                            ? Icons.add_shopping_cart
+                            : Icons.shopping_bag_outlined)
+                        : Icons.remove_shopping_cart_outlined,
+                  ),
+                  label: Text(
+                    !product.inStock
+                        ? 'Sold out'
+                        : quantity > 0
+                            ? 'Add another • $quantity in cart'
+                            : 'Buy Once',
+                  ),
+                ),
               ),
-            ),
-            icon: Icon(
-              quantity > 0
-                  ? Icons.add_shopping_cart
-                  : Icons.shopping_bag_outlined,
-            ),
-            label: Text(
-              quantity > 0 ? 'Add another • $quantity in cart' : 'Add to cart',
-            ),
+            ],
           ),
         ),
       ),

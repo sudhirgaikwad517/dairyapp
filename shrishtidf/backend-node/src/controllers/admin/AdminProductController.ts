@@ -1,6 +1,21 @@
 import { Request, Response } from 'express';
 import prisma from '../../db/prisma';
 import crypto from 'crypto';
+import { PRODUCT_BADGES } from '../../services/ProductService';
+
+/// Only the curated tags are accepted — free text here would render as an
+/// unstyled chip in the app.
+function normalizeBadge(value: any): string | null {
+  if (value === undefined) return undefined as any;
+  const badge = String(value || '').trim();
+  if (badge === '') return null;
+  const match = PRODUCT_BADGES.find((b) => b.toLowerCase() === badge.toLowerCase());
+  return match || null;
+}
+
+function normalizeFoodType(value: any): string {
+  return String(value || '').toLowerCase() === 'non_veg' ? 'non_veg' : 'veg';
+}
 
 function toSafeJson(value: any) {
   return JSON.parse(JSON.stringify(value, (_key, v) => (typeof v === 'bigint' ? Number(v) : v)));
@@ -38,6 +53,11 @@ export class AdminProductController {
         id: p.id,
         name: p.name,
         shortCode: p.short_code,
+        badge: p.badge || '',
+        foodType: p.food_type || 'veg',
+        price: Number(p.buy_once || 0),
+        subscriptionPrice: Number(p.subscription || 0),
+        mrp: Number(p.mrp || 0),
         discount: p.discount,
         gst: Number(p.gst_rate || 0),
         category: p.product_categories?.label || 'Uncategorized',
@@ -143,7 +163,13 @@ export class AdminProductController {
             short_code: b.shortCode,
             size: firstVariant?.packaging || 'N/A',
             buy_once: Number(firstVariant?.rate || 0),
-            subscription: Number(firstVariant?.rate || 0),
+            // Falls back to the buy-once rate only when no subscription rate
+            // was given at all — an admin who deliberately clears it to 0
+            // should get 0, not a silent copy of the buy-once price.
+            subscription: Number(firstVariant?.subscriptionRate ?? firstVariant?.rate ?? 0),
+            mrp: Number(b.mrp || firstVariant?.mrpEcom || 0),
+            badge: normalizeBadge(b.badge) || null,
+            food_type: normalizeFoodType(b.foodType),
             discount: Number(b.discount || 0),
             gst_rate: Number(b.gstRate || 0),
             description: b.description || null,
@@ -172,7 +198,7 @@ export class AdminProductController {
               packets: Number(v.packets || 1),
               ltrs: v.ltrs !== undefined && v.ltrs !== '' ? Number(v.ltrs) : null,
               buy_once: Number(v.rate || 0),
-              subscription: Number(v.rate || 0),
+              subscription: Number(v.subscriptionRate ?? v.rate ?? 0),
               mrp_ecom: Number(v.mrpEcom || 0),
               bottle_applicable: !!v.bottleApplicable,
               pouch_applicable: !!v.pouchApplicable,
@@ -231,6 +257,9 @@ export class AdminProductController {
         if (b.name !== undefined) data.name = b.name;
         if (b.shortCode !== undefined) data.short_code = b.shortCode;
         if (b.discount !== undefined) data.discount = Number(b.discount || 0);
+        if (b.mrp !== undefined) data.mrp = Number(b.mrp || 0);
+        if (b.badge !== undefined) data.badge = normalizeBadge(b.badge);
+        if (b.foodType !== undefined) data.food_type = normalizeFoodType(b.foodType);
         if (b.gstRate !== undefined) data.gst_rate = Number(b.gstRate || 0);
         if (b.description !== undefined) data.description = b.description || null;
         if (b.hsnCode !== undefined) data.hsn_code = b.hsnCode || null;
@@ -243,7 +272,7 @@ export class AdminProductController {
         if (b.isActive !== undefined) data.is_active = !!b.isActive;
         if (variants[0]) {
           data.buy_once = Number(variants[0].rate || 0);
-          data.subscription = Number(variants[0].rate || 0);
+          data.subscription = Number(variants[0].subscriptionRate ?? variants[0].rate ?? 0);
           data.size = variants[0].packaging || existing.size;
         }
 
@@ -263,7 +292,7 @@ export class AdminProductController {
               packets: Number(v.packets || 1),
               ltrs: v.ltrs !== undefined && v.ltrs !== '' ? Number(v.ltrs) : null,
               buy_once: Number(v.rate || 0),
-              subscription: Number(v.rate || 0),
+              subscription: Number(v.subscriptionRate ?? v.rate ?? 0),
               mrp_ecom: Number(v.mrpEcom || 0),
               bottle_applicable: !!v.bottleApplicable,
               pouch_applicable: !!v.pouchApplicable,

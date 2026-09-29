@@ -1,5 +1,5 @@
-import 'package:dairy_app/framework/controller/best_sellers/best_sellers_controller.dart';
-import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
+import 'package:dairy_app/framework/repository/cart/product_model.dart';
+import 'package:dairy_app/ui/cart/add_to_cart_sheet.dart';
 import 'package:dairy_app/ui/products/product_details_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
@@ -12,8 +12,19 @@ import 'package:dairy_app/framework/provider/catalog/catalog_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// The "View All" destination for a home-screen product row. Each row passes
+/// its own title and filter — previously every row landed on Best Sellers.
 class BestSellers extends ConsumerStatefulWidget {
-  const BestSellers({super.key});
+  const BestSellers({
+    super.key,
+    this.title = 'Best Sellers',
+    this.filter,
+  });
+
+  final String title;
+
+  /// Which products belong on this screen. Defaults to the popular ones.
+  final bool Function(ProductModel product)? filter;
 
   @override
   ConsumerState<BestSellers> createState() => _BestSellersConsumerState();
@@ -23,9 +34,8 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
   @override
   Widget build(BuildContext context) {
     final catalogState = ref.watch(catalogNotifierProvider);
-    final products = catalogState.products
-        .where((product) => product.isPopular)
-        .toList();
+    final filter = widget.filter ?? (product) => product.isPopular;
+    final products = catalogState.products.where(filter).toList();
 
     return Scaffold(
       backgroundColor: AppColors.clrF7F7F7,
@@ -141,27 +151,20 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
                                     color: AppColors.clr101828,
                                   ),
                                 ),
-                                CommonText(
-                                  data:
-                                      "${AppConstants.currency}${product.originalPrice.toInt()}",
-                                  style: TextStyles.regular.copyWith(
-                                    fontSize: 12,
-                                    color: AppColors.clrGrey757575,
-                                    decoration: TextDecoration.lineThrough,
+                                if (product.hasMrp)
+                                  CommonText(
+                                    data:
+                                        "${AppConstants.currency}${product.mrp.toInt()}",
+                                    style: TextStyles.regular.copyWith(
+                                      fontSize: 12,
+                                      color: AppColors.clrGrey757575,
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                             CommonButton(
-                              onTap: () {
-                                ref.read(cartProvider).addToCart(product);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text("${product.name} added to cart"),
-                                    duration: const Duration(seconds: 1),
-                                  ),
-                                );
-                              },
+                              onTap: () => showAddToCartSheet(context, product),
                               buttonText: "Add +",
                               buttonColor: AppColors.clr101828,
                               height: 32,
@@ -193,7 +196,7 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
         onPressed: () => Navigator.pop(context),
       ),
       title: CommonText(
-        data: "Best Sellers",
+        data: widget.title,
         style: TextStyles.bold.copyWith(fontSize: 18, color: AppColors.clr101828),
       ),
     );
@@ -211,7 +214,7 @@ class _BestSellersConsumerState extends ConsumerState<BestSellers> {
           ),
           const SizedBox(height: 16),
           CommonText(
-            data: "No Best Sellers found",
+            data: "No ${widget.title} found",
             style: TextStyles.medium.copyWith(color: AppColors.clrGrey757575),
           ),
         ],

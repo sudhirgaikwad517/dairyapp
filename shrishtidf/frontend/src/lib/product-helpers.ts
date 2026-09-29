@@ -11,22 +11,35 @@ export function productDisplayPrices(product: ProductItem): {
   subscription: number;
   size: string;
   variantId?: string;
+  /** 0 when there is no real MRP — the caller must not render a strike-through. */
+  mrp: number;
+  discountPercent: number;
 } {
   const variant = getDefaultVariant(product);
-  if (variant) {
-    return {
-      buyOnce: variant.buyOnce,
-      subscription: variant.subscription,
-      size: variant.sizeLabel,
-      variantId: variant.id,
-    };
-  }
+  const buyOnce = variant ? variant.buyOnce : product.buyOnce;
+
+  // Only a price the admin actually entered counts as an MRP. Deriving one
+  // (price x some multiplier) would advertise a discount that isn't real.
+  const candidate = Math.max(variant?.mrp ?? 0, product.mrp ?? 0);
+  const mrp = candidate > buyOnce ? candidate : 0;
 
   return {
-    buyOnce: product.buyOnce,
-    subscription: product.subscription,
-    size: product.size,
+    buyOnce,
+    subscription: variant ? variant.subscription : product.subscription,
+    size: variant ? variant.sizeLabel : product.size,
+    variantId: variant?.id,
+    mrp,
+    discountPercent: mrp > 0 ? Math.round(((mrp - buyOnce) / mrp) * 100) : 0,
   };
+}
+
+/** Products default to sellable when the API predates the `inStock` field. */
+export function isProductInStock(product: ProductItem): boolean {
+  return product.inStock !== false;
+}
+
+export function isVegProduct(product: ProductItem): boolean {
+  return product.foodType !== "non_veg";
 }
 
 export function formatCustomerAddress(customer: CustomerProfile): string {

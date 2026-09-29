@@ -4,6 +4,7 @@ import crypto from 'crypto';
 export type ActivityType =
   | 'customer_registered'
   | 'feedback'
+  | 'complaint'
   | 'enquiry'
   | 'subscription'
   | 'one_time_order'
@@ -18,6 +19,9 @@ class ActivityLogService {
     title: string;
     message: string;
     customerId?: string | null;
+    subscriptionId?: string | null;
+    effectiveDate?: Date | null;
+    actor?: 'admin' | 'customer';
   }) {
     try {
       await prisma.activity_logs.create({
@@ -28,6 +32,9 @@ class ActivityLogService {
           title: params.title,
           message: params.message,
           customer_id: params.customerId || null,
+          subscription_id: params.subscriptionId || null,
+          effective_date: params.effectiveDate || null,
+          actor: params.actor || null,
           created_at: new Date(),
         },
       });

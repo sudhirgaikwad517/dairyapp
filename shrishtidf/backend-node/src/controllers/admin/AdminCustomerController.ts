@@ -332,28 +332,6 @@ export class AdminCustomerController {
     }
   }
 
-  public async getSubscriptions(req: Request, res: Response) {
-    try {
-      const subscriptions = await prisma.subscriptions.findMany({
-        include: { customers: true, products: true, product_variants: true },
-        orderBy: { created_at: 'desc' }
-      });
-
-      const mapped = subscriptions.map((s: any) => ({
-        id: s.id,
-        customerName: s.customers?.name || 'Unknown',
-        product: `${s.products.name} - ${s.product_variants?.size_label || s.products.size}`,
-        frequency: s.frequency,
-        qty: s.quantity,
-        nextDelivery: s.next_delivery_date,
-        status: s.status === 'active' ? 'Active' : (s.status === 'paused' ? 'Paused' : 'Cancelled')
-      }));
-
-      return res.status(200).json({ success: true, data: mapped });
-    } catch (error) {
-      return res.status(500).json({ success: false, message: 'Server Error' });
-    }
-  }
 }
 
 export const adminCustomerController = new AdminCustomerController();

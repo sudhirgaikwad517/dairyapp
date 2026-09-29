@@ -1,27 +1,36 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, User, ShieldCheck, Users } from 'lucide-react';
+import { cn } from '../lib/utils';
+
+type LoginMode = 'admin' | 'staff';
 
 export default function Login() {
+  const [mode, setMode] = useState<LoginMode>('admin');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  const adminUrl = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5555/api/v1';
+    return apiUrl.replace('/api/v1', '/api/admin');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      // In Docker prod, this should point to /api/admin/login, but for local testing: http://localhost:5555/api/admin/login
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5555/api/v1';
-      const adminUrl = apiUrl.replace('/api/v1', '/api/admin');
-      const response = await axios.post(`${adminUrl}/login`, { email, password });
-      
+      const endpoint = mode === 'admin' ? '/login' : '/staff-login';
+      const payload = mode === 'admin' ? { email, password } : { username, password };
+      const response = await axios.post(`${adminUrl()}${endpoint}`, payload);
+
       if (response.data.success) {
         localStorage.setItem('admin_token', response.data.token);
         navigate('/dashboard');
@@ -50,21 +59,62 @@ export default function Login() {
               Sign in to manage Shrishti Dairy operations
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                <Input
-                  type="email"
-                  placeholder="admin@shrishtidairy.com"
-                  className="pl-10 focus-visible:ring-blue-500"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+          <CardContent className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMode('admin')}
+                className={cn(
+                  'flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors',
+                  mode === 'admin' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <ShieldCheck size={16} /> Super Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('staff')}
+                className={cn(
+                  'flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors',
+                  mode === 'staff' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <Users size={16} /> Employee
+              </button>
             </div>
+
+            {mode === 'admin' ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Input
+                    type="email"
+                    placeholder="admin@shrishtidairy.com"
+                    className="pl-10 focus-visible:ring-blue-500"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Username</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="e.g. sagarc"
+                    className="pl-10 focus-visible:ring-blue-500"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700">Password</label>

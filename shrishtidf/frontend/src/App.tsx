@@ -4,6 +4,7 @@ import { AboutPage } from "@/pages/AboutPage";
 import { AccountPage } from "@/pages/AccountPage";
 import { BlogPage } from "@/pages/BlogPage";
 import { BlogPostPage } from "@/pages/BlogPostPage";
+import { CategoryPage } from "@/pages/CategoryPage";
 import { ComboSaversPage } from "@/pages/ComboSaversPage";
 import { ContactPage } from "@/pages/ContactPage";
 import { FaqsPage } from "@/pages/FaqsPage";
@@ -26,6 +27,7 @@ export default function App() {
       <Route path="/" element={<HomePageRoute />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/products/:id" element={<ProductDetailPage />} />
+      <Route path="/category/:id" element={<CategoryPage />} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/subscription" element={<SubscriptionPage />} />
       <Route path="/trial-packs" element={<TrialPacksPage />} />

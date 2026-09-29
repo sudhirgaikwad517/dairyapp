@@ -60,9 +60,10 @@ export function ProductsSection({
   const gridProducts = searchResults ?? activeProducts.items;
   const isSearchMode = Boolean(searchResults);
 
+  // A picked category goes to its own page; "all" still lands on /products.
   const productsLink =
     activeCategory && activeCategory !== productCategories[0]?.id
-      ? `/products?category=${activeCategory}`
+      ? `/category/${encodeURIComponent(activeCategory)}`
       : "/products";
 
   return (

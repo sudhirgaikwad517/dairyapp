@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
@@ -48,7 +47,7 @@ export default function DeliveryZones() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {zones.map((zone) => (
+              {zones.map((zone: any) => (
                 <TableRow key={zone.id}>
                   <TableCell className="font-bold text-gray-900">{zone.pincode}</TableCell>
                   <TableCell>

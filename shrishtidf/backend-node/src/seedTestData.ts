@@ -17,6 +17,8 @@ async function clean() {
   await prisma.app_banners.deleteMany({});
   await prisma.activity_logs.deleteMany({});
   await prisma.customer_feedback.deleteMany({});
+  await prisma.notifications.deleteMany({});
+  await prisma.farm_visit_requests.deleteMany({});
   await prisma.wastage_logs.deleteMany({});
   await prisma.customers.updateMany({ data: { hub_id: null, route_id: null, delivery_boy_id: null } });
   await prisma.delivery_routes.updateMany({ data: { driver_id: null, hub_id: null } });
@@ -46,11 +48,13 @@ async function clean() {
   await prisma.delivery_routes.deleteMany({});
   await prisma.customers.deleteMany({});
   await prisma.leads.deleteMany({});
+  await prisma.access_controls.deleteMany({});
   await prisma.office_staff.deleteMany({});
   await prisma.staff_types.deleteMany({});
   await prisma.delivery_modes.deleteMany({});
   await prisma.delivery_charge_tiers.deleteMany({});
   await prisma.cancel_reasons.deleteMany({});
+  await prisma.feedback_categories.deleteMany({});
   console.log('Clean done.');
 }
 
@@ -305,7 +309,7 @@ async function seed() {
   const customersData = [
     { id: uuid(), phone: '9876543210', name: 'Rahul Sharma', city: 'Pune', pincode: '411001', address: 'Camp, Pune', hubId: hubPune, routeId: routeNorth, deliveryBoyId: driverMukesh, sequence: 1, lat: 18.5195, lng: 73.8779 },
     { id: uuid(), phone: '9876543211', name: 'Priya Verma', city: 'Pune', pincode: '411002', address: 'Shivajinagar, Pune', hubId: hubPune, routeId: routeNorth, deliveryBoyId: driverMukesh, sequence: 2, lat: 18.5308, lng: 73.8474 },
-    { id: uuid(), phone: '9876543212', name: 'Amit Deshmukh', city: 'Mumbai', pincode: '400001', address: 'Fort, Mumbai', hubId: hubMumbai, routeId: routeSouth, deliveryBoyId: driverSuresh, sequence: 1, lat: 18.9345, lng: 72.8348 },
+    { id: uuid(), phone: '9876543212', name: 'Amit Deshmukh', city: 'Mumbai', pincode: '400001', address: 'Fort, Mumbai', hubId: hubMumbai, routeId: routeSouth, deliveryBoyId: driverSuresh, sequence: 1, lat: 18.9345, lng: 72.8348, customerType: 'postpaid' },
   ];
   for (const c of customersData) {
     const code = await customerCodeService.next();
@@ -325,7 +329,7 @@ async function seed() {
         delivery_sequence: c.sequence,
         latitude: c.lat,
         longitude: c.lng,
-        customer_type: 'prepaid',
+        customer_type: (c as any).customerType || 'prepaid',
         registered_by: 'customer',
         orders_count: 0,
         leads_count: 0,
@@ -440,7 +444,7 @@ async function seed() {
   await createOrder({
     customer: customersData[1],
     items: [{ productId: 'prod_curd_400g', qty: 3 }],
-    status: 'CONFIRMED',
+    status: 'IN_PROCESS',
     paymentStatus: 'paid',
     routeId: routeNorth,
     slotId: slotMorning,
@@ -455,10 +459,48 @@ async function seed() {
     slotId: slotEvening,
     invoiceSuffix: '003',
   });
+  await createOrder({
+    customer: customersData[0],
+    items: [{ productId: 'prod_a2_ghee_500g', qty: 2 }],
+    status: 'SHIPPED',
+    paymentStatus: 'paid',
+    routeId: routeNorth,
+    slotId: slotMorning,
+    invoiceSuffix: '004',
+  });
+  await createOrder({
+    customer: customersData[2],
+    items: [{ productId: 'prod_cow_milk_1l', qty: 1 }],
+    status: 'CANCELLED',
+    paymentStatus: 'pending',
+    routeId: routeSouth,
+    slotId: slotEvening,
+    invoiceSuffix: '005',
+  });
+
+  // ---- Delivery modes (created early — subscriptions below reference them) ----
+  const modeRingBell = uuid();
+  const modeLeaveAtDoor = uuid();
+  const modeCallBefore = uuid();
+  await prisma.delivery_modes.createMany({
+    data: [
+      { id: modeRingBell, name: 'Ring the Bell', is_active: true, sort_order: 0, created_at: now, updated_at: now },
+      { id: modeLeaveAtDoor, name: 'Leave at Door', is_active: true, sort_order: 1, created_at: now, updated_at: now },
+      { id: modeCallBefore, name: 'Call Before Delivery', is_active: true, sort_order: 2, created_at: now, updated_at: now },
+    ],
+  });
 
   // ---- Subscriptions ----
   const today = new Date();
   const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const yesterdayUTC = new Date(todayUTC);
+  yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
+  const tomorrowUTC = new Date(todayUTC);
+  tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
+  const thirtyDaysAgoUTC = new Date(todayUTC);
+  thirtyDaysAgoUTC.setUTCDate(thirtyDaysAgoUTC.getUTCDate() - 35);
+  const expiredAtUTC = new Date(todayUTC);
+  expiredAtUTC.setUTCDate(expiredAtUTC.getUTCDate() - 5);
 
   const subRahul = uuid();
   await prisma.subscriptions.create({
@@ -470,31 +512,45 @@ async function seed() {
       frequency: 'daily',
       quantity: 1,
       delivery_slot_id: slotMorning,
+      delivery_mode_id: modeRingBell,
+      rate: 65,
       status: 'active',
+      start_date: yesterdayUTC,
       next_delivery_date: todayUTC,
       created_at: now,
       updated_at: now,
     },
   });
+  const subPriyaGhee = uuid();
   await prisma.subscriptions.create({
     data: {
-      id: uuid(),
+      id: subPriyaGhee,
       customer_id: customersData[1].id,
       product_id: 'prod_a2_ghee_500g',
       variant_id: variantIds['prod_a2_ghee_500g'],
       frequency: 'weekly',
       quantity: 1,
       delivery_slot_id: slotMorning,
+      delivery_mode_id: modeLeaveAtDoor,
+      rate: 650,
       status: 'paused',
+      start_date: yesterdayUTC,
+      paused_from: todayUTC,
       paused_until: new Date(Date.now() + 5 * 86400000),
       created_at: now,
       updated_at: now,
     },
   });
+  await prisma.activity_logs.create({
+    data: {
+      id: uuid(), type: 'subscription', subtype: 'pause', title: 'Subscribe Pause Request',
+      message: 'Priya Verma, pause request received. Plan will be paused from ' + todayUTC.toISOString().slice(0, 10) + '.',
+      customer_id: customersData[1].id, subscription_id: subPriyaGhee, effective_date: todayUTC, actor: null,
+      created_at: now,
+    },
+  });
 
   const subAmit = uuid();
-  const yesterdayUTC = new Date(todayUTC);
-  yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
   await prisma.subscriptions.create({
     data: {
       id: subAmit,
@@ -504,10 +560,125 @@ async function seed() {
       frequency: 'daily',
       quantity: 2,
       delivery_slot_id: slotEvening,
+      delivery_mode_id: modeCallBefore,
+      rate: 75,
       status: 'active',
+      start_date: yesterdayUTC,
       next_delivery_date: todayUTC,
       created_at: now,
       updated_at: now,
+    },
+  });
+
+  // A change request already submitted for Rahul's milk plan (qty 1 -> 2), pending
+  // until tomorrow — demonstrates the cutoff-aware Change Request flow end to end.
+  const subRahulGheeChange = uuid();
+  await prisma.subscriptions.create({
+    data: {
+      id: subRahulGheeChange,
+      customer_id: customersData[0].id,
+      product_id: 'prod_a2_ghee_500g',
+      variant_id: variantIds['prod_a2_ghee_500g'],
+      frequency: 'daily',
+      quantity: 1,
+      delivery_slot_id: slotMorning,
+      delivery_mode_id: modeRingBell,
+      rate: 650,
+      status: 'active',
+      start_date: yesterdayUTC,
+      next_delivery_date: todayUTC,
+      pending_quantity: 2,
+      change_effective_date: tomorrowUTC,
+      created_at: now,
+      updated_at: now,
+    },
+  });
+  await prisma.activity_logs.create({
+    data: {
+      id: uuid(), type: 'change_request', subtype: 'change_request', title: 'Change Request',
+      message: 'Rahul Sharma requested a change to their subscription, effective ' + tomorrowUTC.toISOString().slice(0, 10) + '.',
+      customer_id: customersData[0].id, subscription_id: subRahulGheeChange, effective_date: tomorrowUTC, actor: null,
+      created_at: now,
+    },
+  });
+
+  // ---- Postpaid inactive plan example (Amit is postpaid; this old plan was deactivated) ----
+  const inactivatedAtUTC = new Date(todayUTC);
+  inactivatedAtUTC.setUTCDate(inactivatedAtUTC.getUTCDate() - 10);
+  await prisma.subscriptions.create({
+    data: {
+      id: uuid(),
+      customer_id: customersData[2].id,
+      product_id: 'prod_curd_400g',
+      variant_id: variantIds['prod_curd_400g'],
+      frequency: 'daily',
+      quantity: 1,
+      rate: 40,
+      status: 'inactive',
+      start_date: thirtyDaysAgoUTC,
+      inactivated_at: inactivatedAtUTC,
+      created_at: now,
+      updated_at: now,
+    },
+  });
+
+  // A prepaid plan whose 30-day validity ran out 5 days ago — shows up under the
+  // "Expired" tab without ever having been explicitly cancelled.
+  await prisma.subscriptions.create({
+    data: {
+      id: uuid(),
+      customer_id: customersData[1].id,
+      product_id: 'prod_cow_milk_1l',
+      variant_id: variantIds['prod_cow_milk_1l'],
+      frequency: 'daily',
+      quantity: 1,
+      delivery_slot_id: slotMorning,
+      delivery_mode_id: modeLeaveAtDoor,
+      rate: 65,
+      status: 'active',
+      start_date: thirtyDaysAgoUTC,
+      next_delivery_date: expiredAtUTC,
+      plan_valid_days: 30,
+      expires_at: expiredAtUTC,
+      created_at: now,
+      updated_at: now,
+    },
+  });
+
+  // ---- Vacation (Priya, starting today for a week — Mark Daily Delivery must skip her over this range) ----
+  const vacationToUTC = new Date(todayUTC);
+  vacationToUTC.setUTCDate(vacationToUTC.getUTCDate() + 7);
+  await prisma.vacations.create({
+    data: {
+      id: uuid(),
+      customer_id: customersData[1].id,
+      from_date: todayUTC,
+      to_date: vacationToUTC,
+      remark: 'Family trip',
+      entry_by: 'admin',
+      created_at: now,
+      updated_at: now,
+    },
+  });
+
+  // ---- A completed pause -> resume cycle on Amit's milk plan (historical, for the Pause Resume Report) ----
+  const pauseRequestAt = new Date(now.getTime() - 3 * 86400000);
+  const resumeRequestAt = new Date(now.getTime() - 1 * 86400000);
+  const pastPauseEffective = new Date(todayUTC); pastPauseEffective.setUTCDate(pastPauseEffective.getUTCDate() - 3);
+  await prisma.activity_logs.create({
+    data: {
+      id: uuid(), type: 'subscription', subtype: 'pause', title: 'Subscribe Pause Request',
+      message: 'Amit Deshmukh, pause request received.',
+      customer_id: customersData[2].id, subscription_id: subAmit, effective_date: pastPauseEffective, actor: null,
+      created_at: pauseRequestAt,
+    },
+  });
+  await prisma.activity_logs.create({
+    data: {
+      id: uuid(), type: 'subscription', subtype: 'resume', title: 'Subscribe Resumed Request',
+      message: 'Amit Deshmukh, resume request received.',
+      customer_id: customersData[2].id, subscription_id: subAmit, effective_date: new Date(now.getTime() - 1 * 86400000), actor: null,
+      created_at: resumeRequestAt,
     },
   });
 
@@ -532,15 +703,131 @@ async function seed() {
     },
   });
 
-  // ---- Feedback (+ activity logs mirroring what real events would produce) ----
+  // ---- One Time Order (admin-placed, via the Subscriptions > One Time Order screen) ----
+  const oneTimeOrderId = uuid();
+  await prisma.orders.create({
+    data: {
+      id: oneTimeOrderId,
+      customer_id: customersData[0].id,
+      customer_name: customersData[0].name,
+      phone: customersData[0].phone,
+      address: customersData[0].address,
+      pincode: customersData[0].pincode,
+      delivery_date: tomorrowUTC,
+      route_id: routeNorth,
+      status: 'PENDING',
+      subtotal: 100,
+      tax_amount: 0,
+      total_amount: 100,
+      payment_method: 'cod',
+      payment_status: 'pending',
+      invoice_number: `SDF-TEST-${oneTimeOrderId.substring(0, 8).toUpperCase()}`,
+      created_at: now,
+      updated_at: now,
+      order_items: {
+        create: [{
+          id: uuid(),
+          product_id: 'prod_fresh_paneer_200g',
+          product_name: 'Fresh Paneer',
+          size: '200g',
+          quantity: 2,
+          unit_price: 50,
+          purchase_type: 'BUY_ONCE',
+          line_total: 100,
+          variant_id: variantIds['prod_fresh_paneer_200g'],
+          created_at: now,
+          updated_at: now,
+        }],
+      },
+    },
+  });
+
+  // ---- Feedback Master (categories) + Feedback (+ activity logs mirroring what real events would produce) ----
+  const feedbackCategoryQuality = uuid();
+  const feedbackCategoryDelay = uuid();
+  await prisma.feedback_categories.createMany({
+    data: [
+      { id: feedbackCategoryQuality, name: 'Milk Quality', is_active: true, created_at: now, updated_at: now },
+      { id: feedbackCategoryDelay, name: 'Delivery Delay', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'Missed Delivery', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'Wrong Product Delivered', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'Billing / Wallet Issue', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'App / Website Issue', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'Delivery Boy Behaviour', is_active: true, created_at: now, updated_at: now },
+      { id: uuid(), name: 'Other', is_active: true, created_at: now, updated_at: now },
+    ],
+  });
+
   await prisma.customer_feedback.create({
     data: {
       id: uuid(),
       customer_id: customersData[0].id,
       rating: 5,
       comment: 'Milk quality is excellent, always fresh on delivery.',
+      feedback_category_id: feedbackCategoryQuality,
+      feedback_mode: 'app',
+      status: 'new',
+      entry_by: 'customer',
+      created_at: now,
+      updated_at: now,
+    },
+  });
+
+  const resolvedFeedbackId = uuid();
+  await prisma.customer_feedback.create({
+    data: {
+      id: resolvedFeedbackId,
+      customer_id: customersData[1].id,
+      comment: 'Milk was delivered 2 hours late today.',
+      feedback_category_id: feedbackCategoryDelay,
+      feedback_mode: 'call',
+      status: 'resolved',
+      reply: 'Apologies for the delay, our delivery boy had a vehicle issue. It will not repeat.',
+      replied_by: 'Admin',
+      replied_at: now,
+      entry_by: 'admin',
+      created_at: now,
+      updated_at: now,
+    },
+  });
+  await prisma.feedback_status_logs.createMany({
+    data: [
+      { id: uuid(), feedback_id: resolvedFeedbackId, status: 'new', changed_by: 'Admin', note: 'Feedback created by admin', created_at: now },
+      { id: uuid(), feedback_id: resolvedFeedbackId, status: 'resolved', changed_by: 'Admin', note: 'Auto-updated after admin reply', created_at: now },
+    ],
+  });
+
+  // ---- Notifications (a welcome broadcast sent to every seeded customer) ----
+  const welcomeNotificationId = uuid();
+  await prisma.notifications.create({
+    data: {
+      id: welcomeNotificationId,
+      title: 'Welcome to Shrishti Dairy Farm!',
+      message: 'Thank you for choosing us for your daily milk delivery. Reach out to us anytime from the Feedback section for any query.',
+      recipient_count: customersData.length,
+      sent_by: 'Admin',
       created_at: now,
     },
+  });
+  await prisma.notification_recipients.createMany({
+    data: customersData.map((c) => ({ id: uuid(), notification_id: welcomeNotificationId, customer_id: c.id, created_at: now })),
+  });
+
+  // ---- Farm Visit Requests (public form, no login required) ----
+  await prisma.farm_visit_requests.createMany({
+    data: [
+      {
+        id: uuid(), name: 'Snehal Patil', contact_no: '9561072231', number_of_persons: 2,
+        address: 'Wakad, Pune', visit_date: new Date(Date.UTC(2026, 9, 4)), visit_time_slot: '02 PM - 03 PM',
+        created_at: now, updated_at: now,
+      },
+      {
+        id: uuid(), name: 'Praveen Purushottam', contact_no: '9011077026', number_of_persons: 4,
+        address: 'Siddhashila Eira, Dhawale Chowk Road, Koyate Wasti, Punawale', visit_date: new Date(Date.UTC(2026, 9, 10)), visit_time_slot: '10 AM - 11 AM',
+        reply: 'Sure, please arrive 10 minutes early at the main gate.', replied_by: 'Admin', replied_at: now,
+        created_at: now, updated_at: now,
+      },
+    ],
   });
 
   await prisma.activity_logs.createMany({
@@ -552,7 +839,6 @@ async function seed() {
       { id: uuid(), type: 'enquiry', title: 'New Enquiry', message: 'Sneha Patil (9123456780) submitted an enquiry: Interested in daily milk delivery', created_at: now },
       { id: uuid(), type: 'one_time_order', title: 'One Time Order Request', message: `${customersData[2].name}, order for Buffalo Milk, Fresh Paneer placed successfully (INV-TEST-003).`, customer_id: customersData[2].id, created_at: now },
       { id: uuid(), type: 'subscription', subtype: 'create', title: 'Subscribe Request', message: `${customersData[0].name}, order for Cow Milk : 1 starting on daily basis is placed successfully.`, customer_id: customersData[0].id, created_at: now },
-      { id: uuid(), type: 'subscription', subtype: 'pause', title: 'Subscribe Pause Request', message: `${customersData[1].name}, pause request received. Plan will be paused.`, customer_id: customersData[1].id, created_at: now },
       { id: uuid(), type: 'wallet', title: 'Wallet Credited', message: `${customersData[0].name} added ₹200 into the wallet.`, customer_id: customersData[0].id, created_at: now },
     ],
   });
@@ -568,27 +854,42 @@ async function seed() {
   });
 
   const staffPasswordHash = await bcrypt.hash('Staff@123', 10);
+  const officeStaffSagar = uuid();
+  const officeStaffPriyanka = uuid();
   await prisma.office_staff.createMany({
     data: [
       {
-        id: uuid(), staff_type_id: staffTypeSupervisor, name: 'Sagar Chankankar', email: 'sagar.staff@dairyapp.com',
+        id: officeStaffSagar, staff_type_id: staffTypeSupervisor, name: 'Sagar Chankankar', email: 'sagar.staff@dairyapp.com',
         contact_no: '9921271527', address: 'Balewadi, Pune', username: 'sagarc', password: staffPasswordHash,
         is_active: true, created_at: now, updated_at: now,
       },
       {
-        id: uuid(), staff_type_id: staffTypeOfficeExec, name: 'Priyanka Jawale', email: 'priyanka.staff@dairyapp.com',
+        id: officeStaffPriyanka, staff_type_id: staffTypeOfficeExec, name: 'Priyanka Jawale', email: 'priyanka.staff@dairyapp.com',
         contact_no: '7588286283', address: 'Yerwada, Pune', username: 'priyankaj', password: staffPasswordHash,
         is_active: true, created_at: now, updated_at: now,
       },
     ],
   });
 
-  // ---- Delivery modes ----
-  await prisma.delivery_modes.createMany({
+  // ---- User Access Control (a realistic starting permission set for the Supervisor) ----
+  const accessControlSagarId = uuid();
+  await prisma.access_controls.create({
+    data: { id: accessControlSagarId, staff_type_id: staffTypeSupervisor, office_staff_id: officeStaffSagar, created_at: now, updated_at: now },
+  });
+  const fullAccess = { can_create: true, can_update: true, can_view: true, can_pdf: true, can_excel: true };
+  const viewOnly = { can_create: false, can_update: false, can_view: true, can_pdf: true, can_excel: true };
+  await prisma.access_control_permissions.createMany({
     data: [
-      { id: uuid(), name: 'Ring the Bell', is_active: true, sort_order: 0, created_at: now, updated_at: now },
-      { id: uuid(), name: 'Leave at Door', is_active: true, sort_order: 1, created_at: now, updated_at: now },
-      { id: uuid(), name: 'Call Before Delivery', is_active: true, sort_order: 2, created_at: now, updated_at: now },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'hub', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'delivery_area', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'route', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'delivery_boy', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'mark_daily_delivery', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'subscribe', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'change_request', ...fullAccess },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'customers', ...viewOnly },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'wallet_report', ...viewOnly },
+      { id: uuid(), access_control_id: accessControlSagarId, module_key: 'feedback', ...viewOnly },
     ],
   });
 

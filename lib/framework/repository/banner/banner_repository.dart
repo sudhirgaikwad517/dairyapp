@@ -6,13 +6,11 @@ import 'package:injectable/injectable.dart';
 class BannerRepository {
   final Dio _dio;
 
-  BannerRepository() : _dio = Dio() {
-    _dio.options.baseUrl = ApiEndpoints.baseUrl;
-  }
+  BannerRepository(this._dio);
 
   Future<Map<String, dynamic>> fetchBanners() async {
     try {
-      final response = await _dio.get('banners');
+      final response = await _dio.get(ApiEndpoints.getBanners);
       if (response.data['success'] == true) {
         return response.data['data'];
       }

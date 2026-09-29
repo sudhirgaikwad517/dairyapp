@@ -1,7 +1,8 @@
 import 'package:dairy_app/framework/controller/address/address_controller.dart';
+import 'package:dairy_app/framework/controller/base/base_controller.dart';
 import 'package:dairy_app/framework/controller/cart/cart_controller.dart';
 import 'package:dairy_app/ui/address/address_screen.dart';
-import 'package:dairy_app/ui/payment/payment_screen.dart';
+import 'package:dairy_app/ui/checkout/checkout_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
 import 'package:dairy_app/ui/utils/theme/text_styles.dart';
@@ -21,6 +22,17 @@ class CartScreen extends ConsumerStatefulWidget {
 
 class _CartScreenConsumerState extends ConsumerState<CartScreen> {
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(cartProvider).loadCart());
+  }
+
+  void _continueShopping() {
+    ref.read(baseProvider).selectTabByTitle('Categories');
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final watchCart = ref.watch(cartProvider);
     final watchAddress = ref.watch(addressProvider);
@@ -34,7 +46,9 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
           _buildHeader(context, watchCart.cartItems.length),
 
           Expanded(
-            child: watchCart.cartItems.isEmpty
+            child: watchCart.isLoading && watchCart.cartItems.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : watchCart.cartItems.isEmpty
                 ? _buildEmptyCart()
                 : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -43,6 +57,8 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                       children: [
                         /// Cart Items List
                         _buildCartItemsList(watchCart),
+                        const SizedBox(height: 12),
+                        _buildContinueShoppingButton(),
                         const SizedBox(height: 24),
 
                         /// Delivery Address Section
@@ -78,7 +94,44 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
             data: "Your cart is empty",
             style: TextStyles.bold.copyWith(fontSize: 18, color: AppColors.clr101828),
           ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _continueShopping,
+            child: CommonContainer(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              borderRadius: BorderRadius.circular(12),
+              color: AppColors.clr101828,
+              child: CommonText(
+                data: "Continue Shopping",
+                style: TextStyles.bold.copyWith(fontSize: 14, color: AppColors.clrWhiteFFFFFF),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContinueShoppingButton() {
+    return GestureDetector(
+      onTap: _continueShopping,
+      child: CommonContainer(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.clr6156F1),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CommonIcon(icon: Icons.add_rounded, size: 18, color: AppColors.clr6156F1),
+            const SizedBox(width: 6),
+            CommonText(
+              data: "Continue Shopping",
+              style: TextStyles.bold.copyWith(fontSize: 14, color: AppColors.clr6156F1),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -123,7 +176,19 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                 color: AppColors.clrF7F7F7,
                 borderRadius: BorderRadius.circular(12),
                 alignment: Alignment.center,
-                child: const CommonIcon(icon: Icons.image, color: AppColors.clrGrey, size: 30),
+                child: (item.imageUrl == null || item.imageUrl!.isEmpty)
+                    ? const CommonIcon(icon: Icons.image, color: AppColors.clrGrey, size: 30)
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          item.imageUrl!,
+                          height: 80,
+                          width: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const CommonIcon(icon: Icons.image, color: AppColors.clrGrey, size: 30),
+                        ),
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -136,7 +201,7 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                     ),
                     const SizedBox(height: 4),
                     CommonText(
-                      data: item.volume,
+                      data: item.size,
                       style: TextStyles.regular.copyWith(fontSize: 13, color: AppColors.clrGrey757575),
                     ),
                     const SizedBox(height: 8),
@@ -144,17 +209,18 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         CommonText(
-                          data: "${AppConstants.currency}${item.price.toInt()}",
+                          data: "${AppConstants.currency}${item.unitPrice.toInt()}",
                           style: TextStyles.bold.copyWith(fontSize: 16, color: AppColors.clr6156F1),
                         ),
                         CommonContainer(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.clrGrey.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.clrGrey.withValues(alpha: 0.3)),
                           child: Row(
                             children: [
-                              _buildQtyBtn(Icons.remove, () {
-                                cart.removeFromCart(item.id);
-                              }),
+                              _buildQtyBtn(
+                                item.quantity > 1 ? Icons.remove : Icons.delete_outline,
+                                () => cart.decrement(item),
+                              ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 child: CommonText(
@@ -162,9 +228,7 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                                   style: TextStyles.bold.copyWith(fontSize: 14),
                                 ),
                               ),
-                              _buildQtyBtn(Icons.add, () {
-                                cart.addToCart(item);
-                              }),
+                              _buildQtyBtn(Icons.add, () => cart.increment(item)),
                             ],
                           ),
                         ),
@@ -259,11 +323,12 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
           color: AppColors.clrWhiteFFFFFF,
           child: Column(
             children: [
-              _buildBillRow("Subtotal", "${AppConstants.currency}${cart.subtotal.toStringAsFixed(1)}"),
-              _buildBillRow("Delivery Charge", "Free", isFree: true),
-              _buildBillRow("GST (5%)", "${AppConstants.currency}${cart.gst.toStringAsFixed(1)}"),
-              const Divider(height: 24),
-              _buildBillRow("Total Amount", "${AppConstants.currency}${cart.totalAmount.toStringAsFixed(1)}", isTotal: true),
+              _buildBillRow("Items Total", "${AppConstants.currency}${cart.subtotal.toStringAsFixed(0)}", isTotal: true),
+              const SizedBox(height: 6),
+              CommonText(
+                data: "Taxes and delivery charges are calculated at checkout, based on your delivery address.",
+                style: TextStyles.regular.copyWith(fontSize: 11, color: AppColors.clrGrey757575),
+              ),
             ],
           ),
         ),
@@ -315,11 +380,11 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CommonText(
-                    data: "Total Amount",
+                    data: "Items Total",
                     style: TextStyles.regular.copyWith(fontSize: 12, color: AppColors.clrGrey757575),
                   ),
                   CommonText(
-                    data: "${AppConstants.currency}${cart.totalAmount.toStringAsFixed(1)}",
+                    data: "${AppConstants.currency}${cart.subtotal.toStringAsFixed(0)}",
                     style: TextStyles.bold.copyWith(fontSize: 20, color: AppColors.clr101828),
                   ),
                 ],
@@ -329,7 +394,7 @@ class _CartScreenConsumerState extends ConsumerState<CartScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const PaymentScreen()),
+                  MaterialPageRoute(builder: (context) => const CheckoutScreen()),
                 );
               },
               buttonText: "Checkout",
