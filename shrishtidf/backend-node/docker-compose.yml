@@ -27,6 +27,15 @@ services:
       - db
     restart: always
 
+  admin_panel:
+    build: 
+      context: ../admin-panel
+    ports:
+      - "3051:80"
+    depends_on:
+      - backend
+    restart: always
+
   # NOTE: Website section is commented out for now.
   # Later, we can uncomment this and attach the domain to this container's port.
   # website:
