@@ -1,31 +1,21 @@
-FROM node:20-alpine AS builder
+FROM node:18-alpine
 
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
-COPY prisma ./prisma/
 
-RUN npm ci
+# Install dependencies
+RUN npm install
 
+# Copy all source files
 COPY . .
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build TypeScript code
-RUN npx tsc
-
-FROM node:20-alpine
-
-WORKDIR /app
-
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-
+# Expose port (from .env)
 EXPOSE 5555
 
-# Push schema and start server
-CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
+# Start the application
+CMD ["npm", "start"]
