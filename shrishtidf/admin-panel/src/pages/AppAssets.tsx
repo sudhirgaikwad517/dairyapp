@@ -37,7 +37,9 @@ function AssetCard({ slot, title, description, aspect, url, onUploaded }: {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('image', file);
-      await api.post(`/admin/app-assets/${slot}`, formData);
+      await api.post(`/admin/app-assets/${slot}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
     },
     onSuccess: () => { setError(''); onUploaded(); },
     onError: (err: any) => setError(err?.response?.data?.message || 'Unable to upload image.')
