@@ -171,7 +171,6 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                           });
                         },
                       ),
-                      ),
                       
                       if (_isPasswordLogin) ...[
                         const SizedBox(height: 16),
