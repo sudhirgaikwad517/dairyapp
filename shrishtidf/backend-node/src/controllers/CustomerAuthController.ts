@@ -101,6 +101,45 @@ export class CustomerAuthController {
     }
   }
 
+  public async signUpWithPassword(req: Request, res: Response) {
+    try {
+      const sessionId = req.headers['session-id'] as string || req.cookies?.session_id || crypto.randomUUID();
+      const { name, phone, password } = req.body;
+
+      if (!name || typeof name !== 'string' || !phone || typeof phone !== 'string' || !password || typeof password !== 'string') {
+        return res.status(422).json({ success: false, message: 'Invalid request data. Name, phone, and password are required.' });
+      }
+
+      if (!req.headers['session-id'] && !req.cookies?.session_id) {
+         res.cookie('session_id', sessionId, { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      }
+
+      const { customer, isNewUser } = await customerAuthService.signUpWithPassword(name, phone, password, sessionId);
+      return res.status(200).json({ success: true, data: { customer, isNewUser, sessionId } });
+    } catch (error: any) {
+      if (error.message === 'ALREADY_REGISTERED') {
+        return res.status(409).json({
+          success: false,
+          errorCode: 'ALREADY_REGISTERED',
+          message: 'An account with this phone number already exists. Please login instead.'
+        });
+      }
+      if (error.message === 'INVALID_PHONE') {
+        return res.status(422).json({
+          success: false,
+          errorCode: 'INVALID_PHONE',
+          message: 'Enter a valid mobile number'
+        });
+      }
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        errorCode: 'AUTH_ERROR',
+        message: 'Unable to sign up'
+      });
+    }
+  }
+
   public async me(req: Request, res: Response) {
     try {
       const sessionId = req.headers['session-id'] as string || req.cookies?.session_id;

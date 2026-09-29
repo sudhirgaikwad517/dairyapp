@@ -1,6 +1,7 @@
 import 'package:dairy_app/framework/dependency_injection/inject.dart';
 import 'package:dairy_app/framework/repository/app_assets/app_assets_cache.dart';
 import 'package:dairy_app/ui/otp/otp_verification_screen.dart';
+import 'package:dairy_app/ui/login/signup_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
 import 'package:dairy_app/ui/utils/theme/assets.gen.dart';
@@ -265,7 +266,7 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                         );
                       }),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       GestureDetector(
                         onTap: () {
                           setState(() {
@@ -276,9 +277,34 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                           _isPasswordLogin ? "Login with OTP instead" : "Login with Password",
                           style: TextStyles.semiBold.copyWith(
                             color: AppColors.clr6156F1,
-                            fontSize: 16,
+                            fontSize: 14,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: TextStyles.regular.copyWith(
+                              color: AppColors.clrGrey757575,
+                              fontSize: 16,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SignupScreen()));
+                            },
+                            child: Text(
+                              "Sign Up",
+                              style: TextStyles.semiBold.copyWith(
+                                color: AppColors.clr6156F1,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
 

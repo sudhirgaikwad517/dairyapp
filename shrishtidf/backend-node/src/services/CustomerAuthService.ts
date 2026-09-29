@@ -296,6 +296,62 @@ export class CustomerAuthService {
     return { customer: this.mapCustomer(customer), isNewUser: !customer.name };
   }
 
+  public async signUpWithPassword(name: string, phone: string, password: string, sessionId: string) {
+    phone = this.normalizePhone(phone);
+    if (phone.length < 10) {
+      throw new Error('INVALID_PHONE');
+    }
+
+    const existing = await prisma.customers.findUnique({ where: { phone } });
+    if (existing) {
+      if (existing.password) {
+        throw new Error('ALREADY_REGISTERED');
+      } else {
+        // Update existing OTP user with password and name
+        const hashedPassword = await bcrypt.hash(password, 10);
+        let updated = await prisma.customers.update({
+          where: { id: existing.id },
+          data: { name: name.trim(), password: hashedPassword, last_seen_at: new Date() },
+          include: { hubs: true, delivery_boys: true }
+        });
+        
+        await this.storeSession(sessionId, updated.id);
+        updated = await this.ensureReferralCode(updated);
+        
+        return { customer: this.mapCustomer(updated), isNewUser: false };
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const code = await customerCodeService.next();
+    
+    let customer: any = await prisma.customers.create({
+      data: {
+        id: crypto.randomUUID(),
+        code,
+        name: name.trim(),
+        phone,
+        password: hashedPassword,
+        orders_count: 0,
+        leads_count: 0,
+        registered_by: 'customer',
+        last_seen_at: new Date()
+      }
+    });
+
+    await activityLogService.log({
+      type: 'customer_registered',
+      title: 'New Customer Registered',
+      message: `A new customer registered with phone ${phone} and password.`,
+      customerId: customer.id
+    });
+
+    await this.storeSession(sessionId, customer.id);
+    customer = await this.ensureReferralCode(customer);
+
+    return { customer: this.mapCustomer(customer), isNewUser: true };
+  }
+
   public mapCustomer(customer: any) {
     return {
       id: customer.id,
