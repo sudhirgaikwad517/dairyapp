@@ -7,7 +7,7 @@ class ApiEndpoints {
   /// Android emulator reaches the host machine at 10.0.2.2.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: "http://10.0.2.2:5555/api/v1/",
+    defaultValue: "https://erp.shrishtidairyfarm.com/api/v1/",
   );
 
   static const String sendOtp = "auth/otp/send";

@@ -180,6 +180,7 @@ model customers {
   created_at                                          DateTime?             @db.Timestamp(0)
   updated_at                                          DateTime?             @db.Timestamp(0)
   email                                               String?               @db.VarChar(255)
+  password                                            String?               @db.VarChar(255)
   flat_no                                             String?               @db.VarChar(255)
   society_name                                        String?               @db.VarChar(255)
   street_name                                         String?               @db.VarChar(255)

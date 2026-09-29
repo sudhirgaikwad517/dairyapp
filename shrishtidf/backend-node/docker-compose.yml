@@ -4,9 +4,9 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Root@123
-      POSTGRES_DB: shrishti_dairy
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Root@123}
+      POSTGRES_DB: ${POSTGRES_DB:-shrishti_dairy}
     ports:
       # If you only want it accessible internally to other docker containers, remove the ports mapping.
       # Exposing to 5432 on server allows external db management tools to connect.
@@ -21,13 +21,8 @@ services:
       # Host Port : Container Port
       # Server ka 3050 port nginx use karega proxy ke liye
       - "3050:5555"
-    environment:
-      - PORT=5555
-      # Docker me database 'db' service name se access hoga
-      - DATABASE_URL=postgresql://postgres:Root@123@db:5432/shrishti_dairy?schema=public
-      - JWT_SECRET=your-secret-key-here
-      - RAZORPAY_KEY_ID=rzp_test_TbEJx37O8K2RUy
-      - RAZORPAY_KEY_SECRET=iGY0PaWmxPbQei4dOnEjvR1N
+    env_file:
+      - .env
     depends_on:
       - db
     restart: always

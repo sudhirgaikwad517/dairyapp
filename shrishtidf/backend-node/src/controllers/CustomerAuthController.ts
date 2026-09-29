@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { customerAuthService } from '../services/CustomerAuthService';
+import crypto from 'crypto';
 
 export class CustomerAuthController {
   public async sendOtp(req: Request, res: Response) {
@@ -56,6 +57,46 @@ export class CustomerAuthController {
         success: false,
         errorCode: 'AUTH_ERROR',
         message: 'Unable to verify OTP'
+      });
+    }
+  }
+
+  public async loginWithPassword(req: Request, res: Response) {
+    try {
+      const sessionId = req.headers['session-id'] as string || req.cookies?.session_id || crypto.randomUUID();
+      const { phoneOrEmail, password } = req.body;
+
+      if (!phoneOrEmail || typeof phoneOrEmail !== 'string' || !password || typeof password !== 'string') {
+        return res.status(422).json({ success: false, message: 'Invalid request data. phoneOrEmail and password are required.' });
+      }
+
+      if (!req.headers['session-id'] && !req.cookies?.session_id) {
+         // Optionally set a new session cookie if this is a new login
+         res.cookie('session_id', sessionId, { httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      }
+
+      const { customer, isNewUser } = await customerAuthService.loginWithPassword(phoneOrEmail, password, sessionId);
+      return res.status(200).json({ success: true, data: { customer, isNewUser, sessionId } });
+    } catch (error: any) {
+      if (error.message === 'INVALID_CREDENTIALS') {
+        return res.status(401).json({
+          success: false,
+          errorCode: 'INVALID_CREDENTIALS',
+          message: 'Invalid phone/email or password'
+        });
+      }
+      if (error.message === 'PASSWORD_NOT_SET') {
+        return res.status(401).json({
+          success: false,
+          errorCode: 'PASSWORD_NOT_SET',
+          message: 'Password is not set for this account. Please login with OTP and set a password in your profile.'
+        });
+      }
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        errorCode: 'AUTH_ERROR',
+        message: 'Unable to login'
       });
     }
   }

@@ -2,6 +2,7 @@ import prisma from '../db/prisma';
 import crypto from 'crypto';
 import { activityLogService } from './ActivityLogService';
 import { customerCodeService } from './CustomerCodeService';
+import bcrypt from 'bcryptjs';
 
 // OTPs and sessions are stored in the database (customer_otps /
 // customer_sessions) rather than process memory, so a restart or deploy
@@ -13,7 +14,7 @@ export class CustomerAuthService {
   
   private readonly PROFILE_FIELDS = [
     'name', 'email', 'flatNo', 'societyName', 'streetName',
-    'landmark', 'city', 'state', 'pincode', 'gstNumber', 'deliveryMode'
+    'landmark', 'city', 'state', 'pincode', 'gstNumber', 'deliveryMode', 'password'
   ];
 
   public async sendOtp(phone: string) {
@@ -189,6 +190,9 @@ export class CustomerAuthService {
 
         if (value === null || (typeof value === 'string' && value.trim() === '')) {
           dataToUpdate[column] = null;
+        } else if (field === 'password') {
+          // Hash password if it's being updated
+          dataToUpdate[column] = await bcrypt.hash(value, 10);
         } else {
           dataToUpdate[column] = typeof value === 'string' ? value.trim() : value;
         }
@@ -255,6 +259,41 @@ export class CustomerAuthService {
         itemCount: order.order_items.reduce((acc: number, item: any) => acc + item.quantity, 0)
       };
     });
+  }
+
+  public async loginWithPassword(phoneOrEmail: string, password: string, sessionId: string) {
+    const isPhone = /^\d+$/.test(phoneOrEmail);
+    const normalizedIdentifier = isPhone ? this.normalizePhone(phoneOrEmail) : phoneOrEmail.trim().toLowerCase();
+
+    let customer = await prisma.customers.findFirst({
+      where: isPhone 
+        ? { phone: normalizedIdentifier } 
+        : { email: { equals: normalizedIdentifier, mode: 'insensitive' } },
+      include: { hubs: true, delivery_boys: true }
+    });
+
+    if (!customer) {
+      throw new Error('INVALID_CREDENTIALS');
+    }
+
+    if (!customer.password) {
+      throw new Error('PASSWORD_NOT_SET');
+    }
+
+    const isValidPassword = await bcrypt.compare(password, customer.password);
+    if (!isValidPassword) {
+      throw new Error('INVALID_CREDENTIALS');
+    }
+
+    await prisma.customers.update({
+      where: { id: customer.id },
+      data: { last_seen_at: new Date() }
+    });
+
+    await this.storeSession(sessionId, customer.id);
+    customer = await this.ensureReferralCode(customer);
+
+    return { customer: this.mapCustomer(customer), isNewUser: !customer.name };
   }
 
   public mapCustomer(customer: any) {
