@@ -26,10 +26,14 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
 
   final GlobalKey _loginButtonKey = GlobalKey();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isPasswordLogin = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -110,7 +114,9 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
 
                       /// Subtitle
                       CommonText(
-                        data: "We will send a confirmation code\n to your phone",
+                        data: _isPasswordLogin 
+                            ? "Enter your credentials to login" 
+                            : "We will send a confirmation code\n to your phone",
                         textAlign: TextAlign.center,
                         style: TextStyles.regular.copyWith(
                           color: AppColors.clrGrey757575,
@@ -165,6 +171,32 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                           });
                         },
                       ),
+                      ),
+                      
+                      if (_isPasswordLogin) ...[
+                        const SizedBox(height: 16),
+                        CommonTextFormField(
+                          controller: _passwordController,
+                          hintText: "Password",
+                          obscureText: _obscurePassword,
+                          prefixIcon: const Icon(Icons.lock_outline, color: AppColors.clr6156F1),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: AppColors.clrGrey757575,
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 15),
+                          borderRadius: 18,
+                          enabledBorderColor: AppColors.grayEAECF0,
+                          focusedBorderColor: AppColors.clr6156F1,
+                        ),
+                      ],
                       const SizedBox(height: 32),
 
                       /// Login Button
@@ -172,36 +204,48 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                         final authState = ref.watch(authNotifierProvider);
                         return CommonButton(
                           onTap: authState.isLoading ? () {} : () async {
-                            if (_phoneController.text.length < 10) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text("Enter a valid 10-digit number"),
-                                  behavior: SnackBarBehavior.floating,
-                                  margin: EdgeInsets.only(
-                                    bottom: MediaQuery.of(context).size.height - 150,
-                                    left: 20,
-                                    right: 20,
+                            if (_isPasswordLogin) {
+                              if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text("Enter phone and password"),
+                                    behavior: SnackBarBehavior.floating,
                                   ),
-                                ),
-                              );
-                              return;
-                            }
-                            final success = await ref.read(authNotifierProvider.notifier).sendOtp(_phoneController.text);
-                            if (success && mounted) {
-                              Navigator.of(context).push(MaterialPageRoute(builder: (context)=> OtpVerificationScreen()));
-                            } else if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(ref.read(authNotifierProvider).error ?? "Failed to send OTP"),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: Colors.redAccent,
-                                  margin: EdgeInsets.only(
-                                    bottom: MediaQuery.of(context).size.height - 150,
-                                    left: 20,
-                                    right: 20,
+                                );
+                                return;
+                              }
+                              final success = await ref.read(authNotifierProvider.notifier).loginWithPassword(_phoneController.text, _passwordController.text);
+                              if (!success && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(ref.read(authNotifierProvider).error ?? "Failed to login"),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: Colors.redAccent,
                                   ),
-                                ),
-                              );
+                                );
+                              }
+                            } else {
+                              if (_phoneController.text.length < 10) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text("Enter a valid 10-digit number"),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+                              final success = await ref.read(authNotifierProvider.notifier).sendOtp(_phoneController.text);
+                              if (success && mounted) {
+                                Navigator.of(context).push(MaterialPageRoute(builder: (context)=> OtpVerificationScreen()));
+                              } else if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(ref.read(authNotifierProvider).error ?? "Failed to send OTP"),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
                             }
                           },
                           key: _loginButtonKey,
@@ -221,6 +265,23 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                           ),
                         );
                       }),
+                      
+                      const SizedBox(height: 24),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isPasswordLogin = !_isPasswordLogin;
+                          });
+                        },
+                        child: Text(
+                          _isPasswordLogin ? "Login with OTP instead" : "Login with Password",
+                          style: TextStyles.semiBold.copyWith(
+                            color: AppColors.clr6156F1,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
 
                     ],
                   ),

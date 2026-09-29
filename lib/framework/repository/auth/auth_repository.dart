@@ -47,6 +47,25 @@ class AuthRepository {
     }
   }
 
+  Future<Map<String, dynamic>> loginWithPassword(String phoneOrEmail, String password) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.login,
+        data: {'phoneOrEmail': phoneOrEmail, 'password': password},
+      );
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        return {'success': false, 'message': 'Network Error'};
+      }
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> me({String? sessionId}) async {
     try {
       final response = await _dio.get(

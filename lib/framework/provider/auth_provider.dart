@@ -117,6 +117,41 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<bool> loginWithPassword(String phoneOrEmail, String password) async {
+    final repository = ref.read(authRepositoryProvider);
+    state = state.copyWith(isLoading: true, error: null);
+    
+    final response = await repository.loginWithPassword(phoneOrEmail, password);
+
+    if (response['success'] == true) {
+      final data = response['data'] as Map<String, dynamic>?;
+      final customer = data?['customer'] as Map<String, dynamic>?;
+      final isNewUser = data?['isNewUser'] == true;
+      final sessionId = data?['sessionId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      await _hive.saveSession(
+        phone: customer?['phone']?.toString() ?? phoneOrEmail,
+        sessionId: sessionId,
+        customerId: customer?['id']?.toString(),
+        code: customer?['code']?.toString(),
+        name: customer?['name']?.toString(),
+      );
+
+      state = state.copyWith(
+        isLoading: false,
+        sessionId: sessionId,
+        phone: customer?['phone']?.toString() ?? phoneOrEmail,
+        isNewUser: isNewUser,
+        status: isNewUser ? SessionStatus.needsProfile : SessionStatus.loggedIn,
+        customer: customer,
+      );
+      return true;
+    } else {
+      state = state.copyWith(isLoading: false, error: response['message']?.toString() ?? 'Invalid Credentials');
+      return false;
+    }
+  }
+
   /// Called once at splash. Checks for a session id saved on-device and
   /// confirms with the backend that it's still valid (the server keeps
   /// sessions in memory, so they don't survive a server restart).
