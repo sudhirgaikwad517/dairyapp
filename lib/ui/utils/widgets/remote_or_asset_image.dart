@@ -35,8 +35,8 @@ class RemoteOrAssetImage extends StatelessWidget {
       fit: fit,
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
-      placeholder: (context, _) => CommonAssetImage(path: assetPath, height: height, width: width, fit: fit),
-      errorWidget: (context, _, __) => CommonAssetImage(path: assetPath, height: height, width: width, fit: fit),
+      placeholder: (context, _) => Center(child: CommonAssetImage(path: assetPath, height: height, width: width)),
+      errorWidget: (context, _, __) => Center(child: CommonAssetImage(path: assetPath, height: height, width: width)),
     );
   }
 }

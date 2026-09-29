@@ -30,16 +30,26 @@ class _SplashScreenConsumerState extends ConsumerState<SplashScreen> {
   }
   @override
   Widget build(BuildContext context) {
+    final customSplashUrl = getIt<AppAssetsCache>().splashImageUrl;
+
     return Scaffold(
       backgroundColor: AppColors.clr6B60FE,
-      body: Center(
-        child: RemoteOrAssetImage(
-          remoteUrl: getIt<AppAssetsCache>().splashImageUrl,
-          assetPath: Assets.images.dairyAppLogo.path,
-          height: 300,
-          width: 300,
-        ),
-      ),
+      body: customSplashUrl != null && customSplashUrl.isNotEmpty
+          ? SizedBox.expand(
+              child: RemoteOrAssetImage(
+                remoteUrl: customSplashUrl,
+                assetPath: Assets.images.dairyAppLogo.path,
+                fit: BoxFit.cover,
+              ),
+            )
+          : Center(
+              child: RemoteOrAssetImage(
+                remoteUrl: null,
+                assetPath: Assets.images.dairyAppLogo.path,
+                height: 300,
+                width: 300,
+              ),
+            ),
     );
   }
 
