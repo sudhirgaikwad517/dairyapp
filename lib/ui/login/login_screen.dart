@@ -184,7 +184,7 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                               _obscurePassword ? Icons.visibility_off : Icons.visibility,
                               color: AppColors.clrGrey757575,
                             ),
-                            onTap: () {
+                            onPressed: () {
                               setState(() {
                                 _obscurePassword = !_obscurePassword;
                               });
