@@ -121,7 +121,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final repository = ref.read(authRepositoryProvider);
     state = state.copyWith(isLoading: true, error: null);
     
-    final response = await repository.loginWithPassword(phoneOrEmail, password);
+    final response = await repository.loginWithPassword(phoneOrEmail.trim(), password.trim());
 
     if (response['success'] == true) {
       final data = response['data'] as Map<String, dynamic>?;

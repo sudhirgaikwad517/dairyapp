@@ -262,8 +262,9 @@ export class CustomerAuthService {
   }
 
   public async loginWithPassword(phoneOrEmail: string, password: string, sessionId: string) {
+    phoneOrEmail = phoneOrEmail.trim();
     const isPhone = /^\d+$/.test(phoneOrEmail);
-    const normalizedIdentifier = isPhone ? this.normalizePhone(phoneOrEmail) : phoneOrEmail.trim().toLowerCase();
+    const normalizedIdentifier = isPhone ? this.normalizePhone(phoneOrEmail) : phoneOrEmail.toLowerCase();
 
     let customer = await prisma.customers.findFirst({
       where: isPhone 
