@@ -114,17 +114,6 @@ class _OtpVerificationScreenConsumerState extends ConsumerState<OtpVerificationS
                                     fontSize: 18,
                                   ),
                                 ),
-                                if (ref.watch(authNotifierProvider).debugOtp != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: CommonText(
-                                      data: "Test OTP: ${ref.watch(authNotifierProvider).debugOtp}",
-                                      style: TextStyles.bold.copyWith(
-                                        color: Colors.red,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
                                 const SizedBox(height: 45),
 
                                 /// OTP Input
