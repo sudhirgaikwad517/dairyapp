@@ -34,7 +34,9 @@ class _SplashScreenConsumerState extends ConsumerState<SplashScreen> {
     final customSplashUrl = getIt<AppAssetsCache>().splashImageUrl;
 
     return Scaffold(
-      backgroundColor: AppColors.clr6B60FE,
+      backgroundColor: customSplashUrl != null && customSplashUrl.isNotEmpty
+          ? Colors.white
+          : AppColors.clr6B60FE,
       body: customSplashUrl != null && customSplashUrl.isNotEmpty
           ? SizedBox.expand(
               child: CachedNetworkImage(
