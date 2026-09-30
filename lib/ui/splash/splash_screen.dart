@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dairy_app/framework/dependency_injection/inject.dart';
 import 'package:dairy_app/framework/provider/auth_provider.dart';
 import 'package:dairy_app/framework/repository/app_assets/app_assets_cache.dart';
@@ -36,16 +37,24 @@ class _SplashScreenConsumerState extends ConsumerState<SplashScreen> {
       backgroundColor: AppColors.clr6B60FE,
       body: customSplashUrl != null && customSplashUrl.isNotEmpty
           ? SizedBox.expand(
-              child: RemoteOrAssetImage(
-                remoteUrl: customSplashUrl,
-                assetPath: Assets.images.dairyAppLogo.path,
+              child: CachedNetworkImage(
+                imageUrl: customSplashUrl,
                 fit: BoxFit.cover,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
+                placeholder: (context, _) => const SizedBox(),
+                errorWidget: (context, _, __) => Center(
+                  child: Image.asset(
+                    Assets.images.dairyAppLogo.path,
+                    height: 300,
+                    width: 300,
+                  ),
+                ),
               ),
             )
           : Center(
-              child: RemoteOrAssetImage(
-                remoteUrl: null,
-                assetPath: Assets.images.dairyAppLogo.path,
+              child: Image.asset(
+                Assets.images.dairyAppLogo.path,
                 height: 300,
                 width: 300,
               ),
