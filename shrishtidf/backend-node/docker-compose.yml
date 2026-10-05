@@ -36,15 +36,15 @@ services:
       - backend
     restart: always
 
-  # NOTE: Website section is commented out for now.
-  # Later, we can uncomment this and attach the domain to this container's port.
-  # website:
-  #   image: nginx:alpine
-  #   ports:
-  #     - "3060:80"
-  #   volumes:
-  #     - ./website-build:/usr/share/nginx/html
-  #   restart: always
+  # Website frontend
+  website:
+    build:
+      context: ../frontend
+    ports:
+      - "3060:80"
+    depends_on:
+      - backend
+    restart: always
 
 volumes:
   pgdata:
