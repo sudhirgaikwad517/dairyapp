@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Get base URL from environment or fallback to localhost
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5555/api';
+// Get base URL from environment or fallback to relative path for production
+const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
   baseURL,
