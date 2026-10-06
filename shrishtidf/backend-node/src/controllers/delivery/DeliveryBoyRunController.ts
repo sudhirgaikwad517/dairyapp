@@ -75,7 +75,7 @@ export class DeliveryBoyRunController {
     try {
       if (!req.deliveryBoy) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-      const { recordId } = req.params;
+      const recordId = req.params.recordId as string;
       const { status, quantityDelivered, remark, leakPhotoUrl, deliveryPhotoUrl } = req.body;
 
       if (!['delivered', 'skipped', 'damaged'].includes(status)) {
