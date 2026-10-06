@@ -14,10 +14,13 @@ services:
       context: ./backend-node
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://shrishti:shrishti@postgres:5432/shrishti_dairy?schema=public
+      DATABASE_URL: postgresql://postgres:Root@123@backend-node-db-1:5432/shrishti_dairy?schema=public
       JWT_SECRET: supersecret_shrishti
-    depends_on:
-      - postgres
+    networks:
+      - default
+      - old_backend
+    # depends_on:
+    #   - postgres  # Removed because we connect to the external old database instead
 
   admin_panel:
     build:
@@ -51,6 +54,12 @@ services:
       - admin_panel
       - delivery_app
       - backend
+
+networks:
+  default:
+  old_backend:
+    name: backend-node_default
+    external: true
 
 volumes:
   postgres_data:
