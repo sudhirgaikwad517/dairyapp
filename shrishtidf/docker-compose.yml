@@ -35,6 +35,13 @@ services:
     depends_on:
       - backend
 
+  delivery_app:
+    build:
+      context: ./delivery-app
+    restart: unless-stopped
+    depends_on:
+      - backend
+
   gateway:
     image: nginx:alpine
     ports:
@@ -44,6 +51,7 @@ services:
     depends_on:
       - frontend
       - admin_panel
+      - delivery_app
       - backend
 
 volumes:
