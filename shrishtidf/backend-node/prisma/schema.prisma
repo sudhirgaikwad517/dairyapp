@@ -362,6 +362,8 @@ model delivery_records {
   bottles_collected  Int               @default(0)
   status             String            @default("delivered") @db.VarChar(20)
   delivered_at       DateTime?         @db.Timestamp(0)
+  leak_photo_url     String?           @db.VarChar(500)
+  delivery_photo_url String?           @db.VarChar(500)
   created_at         DateTime?         @db.Timestamp(0)
   updated_at         DateTime?         @db.Timestamp(0)
   subscriptions      subscriptions     @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "delivery_records_subscription_id_foreign")

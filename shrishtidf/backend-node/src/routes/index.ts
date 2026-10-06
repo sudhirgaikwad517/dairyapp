@@ -40,7 +40,11 @@ router.use('/wallet', walletRoutes);
 router.use('/subscriptions', subscriptionRoutes);
 router.use('/vacations', vacationRoutes);
 
+import deliveryRoutes from './delivery';
+
 // Standalone routes
+router.use('/delivery-boy', deliveryRoutes);
+
 router.get('/categories', categoryController.index.bind(categoryController));
 router.get('/categories/:id', categoryController.show.bind(categoryController));
 router.get('/site-content', siteContentController.index.bind(siteContentController));
