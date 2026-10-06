@@ -1,9 +1,10 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './pages/LoginScreen';
 import DashboardScreen from './pages/DashboardScreen';
 import DeliveryDetailScreen from './pages/DeliveryDetailScreen';
 
-function ProtectedRoute({ children }: { children: JSX.Element }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('delivery_token');
   if (!token) {
     return <Navigate to="/login" replace />;

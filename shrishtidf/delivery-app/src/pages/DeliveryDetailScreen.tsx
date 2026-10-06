@@ -17,8 +17,8 @@ export default function DeliveryDetailScreen() {
   
   // Note: Photo upload logic would integrate with device camera or file input. 
   // We'll keep it as a UI placeholder for now.
-  const [leakPhoto, setLeakPhoto] = useState<string | null>(null);
-  const [deliveryPhoto, setDeliveryPhoto] = useState<string | null>(null);
+  const [leakPhoto] = useState<string | null>(null);
+  const [deliveryPhoto] = useState<string | null>(null);
 
   if (!record) {
     return (
