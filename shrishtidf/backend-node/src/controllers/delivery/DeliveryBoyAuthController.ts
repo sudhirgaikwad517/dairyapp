@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../../db/prisma';
-import { signDeliveryBoyToken, revokeToken } from '../../middleware/deliveryAuth';
+import { signDeliveryBoyToken } from '../../middleware/deliveryAuth';
 
 export class DeliveryBoyAuthController {
   public async login(req: Request, res: Response) {
