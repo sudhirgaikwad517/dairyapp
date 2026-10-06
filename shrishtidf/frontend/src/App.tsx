@@ -39,6 +39,7 @@ export default function App() {
       <Route path="/track-order" element={<TrackOrderPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/account" element={<AccountPage />} />
+      <Route path="/app" element={<Navigate to="/account" replace />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsPage />} />
