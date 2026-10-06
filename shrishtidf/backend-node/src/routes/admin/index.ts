@@ -209,6 +209,7 @@ router.post('/logistics/daily-deliveries/:id/unmark', requirePermission('mark_da
 // Logistics & Inventory
 router.get('/inventory', requirePermission('inventory', 'view'), adminLogisticsController.getInventory.bind(adminLogisticsController));
 router.get('/zones', requirePermission('delivery_zones', 'view'), adminLogisticsController.getZones.bind(adminLogisticsController));
+router.post('/zones', requirePermission('delivery_zones', 'create'), adminLogisticsController.createZone.bind(adminLogisticsController));
 router.get('/dispatch', requirePermission('dispatch_sheet', 'view'), adminLogisticsController.getDispatchSheet.bind(adminLogisticsController));
 
 // Leads

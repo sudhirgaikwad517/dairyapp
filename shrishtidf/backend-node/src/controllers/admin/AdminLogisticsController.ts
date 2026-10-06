@@ -92,6 +92,44 @@ export class AdminLogisticsController {
     }
   }
 
+  public async createZone(req: Request, res: Response) {
+    try {
+      const { pincode, area, city, route, fee, minOrder, active } = req.body;
+
+      if (!pincode) {
+        return res.status(400).json({ success: false, message: 'Pincode is required' });
+      }
+
+      const existingZone = await prisma.delivery_zones.findUnique({
+        where: { pincode }
+      });
+
+      if (existingZone) {
+        return res.status(400).json({ success: false, message: 'Zone with this pincode already exists' });
+      }
+
+      const zone = await prisma.delivery_zones.create({
+        data: {
+          id: require('crypto').randomUUID(),
+          pincode,
+          area_name: area || null,
+          city: city || null,
+          route_id: route || null,
+          delivery_fee: fee ? parseInt(fee, 10) : 0,
+          min_order_value: minOrder ? parseInt(minOrder, 10) : null,
+          is_serviceable: active !== false,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+
+      return res.status(201).json({ success: true, data: zone });
+    } catch (error) {
+      console.error('Error creating delivery zone:', error);
+      return res.status(500).json({ success: false, message: 'Server Error' });
+    }
+  }
+
   public async getDispatchSheet(req: Request, res: Response) {
     try {
       const dateParam = req.query.date as string;
