@@ -36,6 +36,9 @@ export default function DeliveryZones() {
       queryClient.invalidateQueries({ queryKey: ['zones'] });
       setIsModalOpen(false);
       setFormData({ pincode: '', area: '', city: '', fee: '', minOrder: '', active: true });
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || 'Failed to save zone');
     }
   });
 
