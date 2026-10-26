@@ -1,0 +1,38 @@
+# Shared database + ERP admin panel.
+#
+# The compose project keeps its original name, `backend-node`, so it still
+# owns the existing containers (backend-node-db-1, backend-node-admin_panel-1),
+# the `backend-node_pgdata` data volume and the `backend-node_default` network
+# that ../docker-compose.yml joins. Renaming it would start an empty database.
+#
+# The ERP API (erp.shrishtidairyfarm.com/api -> port 3050) is the Python
+# backend in ../backend-python, run as the `shrishti-backend-python` container:
+#   docker build -t shrishti-backend-python ../backend-python
+#   docker run -d --name shrishti-backend-python --restart unless-stopped \
+#     --env-file ../backend-python/.env -e PORT=5555 --network backend-node_default \
+#     -p 3050:5555 shrishti-backend-python
+name: backend-node
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Root@123}
+      POSTGRES_DB: ${POSTGRES_DB:-shrishti_dairy}
+    ports:
+      # Remove this mapping to keep the database reachable only from other containers.
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  admin_panel:
+    build:
+      context: ../admin-panel
+    ports:
+      - "3051:80"
+    restart: always
+
+volumes:
+  pgdata:

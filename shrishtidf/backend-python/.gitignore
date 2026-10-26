@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+# Keep environment variables out of version control
+.env
+
+# Admin-uploaded files (splash/login images, etc.) — runtime content, not source.
+/uploads/*
+!/uploads/.gitkeep

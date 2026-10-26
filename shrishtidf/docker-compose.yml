@@ -11,7 +11,8 @@ services:
 
   backend:
     build:
-      context: ./backend-node
+      # FastAPI backend.
+      context: ./backend-python
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:Root@123@backend-node-db-1:5432/shrishti_dairy?schema=public
