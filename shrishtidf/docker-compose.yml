@@ -37,6 +37,14 @@ services:
     depends_on:
       - backend
 
+  customer_web:
+    build:
+      # The Flutter customer app for the browser; make customer-web/html first with customer-web/build.sh
+      context: ./customer-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+
   delivery_app:
     build:
       context: ./delivery-app
@@ -52,6 +60,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend
+      - customer_web
       - admin_panel
       - delivery_app
       - backend

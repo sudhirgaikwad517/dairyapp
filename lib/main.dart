@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dairy_app/ui/login/login_screen.dart';
 import 'package:dairy_app/ui/splash/splash_screen.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
@@ -78,6 +79,19 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: appNavigatorKey,
+      title: 'Shrishti Dairy Farm',
+      // In a wide browser window the app keeps a phone's width, centred, so it looks the same as on the phone
+      builder: kIsWeb
+          ? (context, child) => ColoredBox(
+                color: const Color(0xFFF1F1F4),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: child,
+                  ),
+                ),
+              )
+          : null,
       home: const SplashScreen(),
     );
   }

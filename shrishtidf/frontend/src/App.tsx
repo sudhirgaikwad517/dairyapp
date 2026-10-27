@@ -20,6 +20,8 @@ import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { TermsPage } from "@/pages/TermsPage";
 import { TrackOrderPage } from "@/pages/TrackOrderPage";
 import { TrialPacksPage } from "@/pages/TrialPacksPage";
+import { OpenCustomerApp } from "@/components/OpenCustomerApp";
+import { isPhone } from "@/lib/mobile-app";
 
 export default function App() {
   return (
@@ -37,9 +39,9 @@ export default function App() {
       <Route path="/blog" element={<BlogPage />} />
       <Route path="/blog/:slug" element={<BlogPostPage />} />
       <Route path="/track-order" element={<TrackOrderPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/account" element={<AccountPage />} />
-      <Route path="/app" element={<Navigate to="/account" replace />} />
+      <Route path="/login" element={isPhone() ? <OpenCustomerApp /> : <LoginPage />} />
+      <Route path="/account" element={isPhone() ? <OpenCustomerApp /> : <AccountPage />} />
+      <Route path="/app" element={<OpenCustomerApp />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsPage />} />

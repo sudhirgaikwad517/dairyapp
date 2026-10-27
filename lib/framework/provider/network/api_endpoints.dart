@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class ApiEndpoints {
 
   ApiEndpoints._();
@@ -5,10 +7,15 @@ class ApiEndpoints {
   /// Override per machine without editing code:
   ///   flutter run --dart-define=API_BASE_URL=http://<your-lan-ip>:5555/api/v1/
   /// Android emulator reaches the host machine at 10.0.2.2.
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: "https://erp.shrishtidairyfarm.com/api/v1/",
-  );
+  static const String _definedBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+  /// In the browser the app is served by the website itself (shrishtidairyfarm.com/app/),
+  /// so it talks to the API on the same site and needs no CORS.
+  static final String baseUrl = _definedBaseUrl.isNotEmpty
+      ? _definedBaseUrl
+      : kIsWeb
+          ? '${Uri.base.origin}/api/v1/'
+          : "https://erp.shrishtidairyfarm.com/api/v1/";
 
   static const String sendOtp = "auth/otp/send";
   static const String verifyOtp = "auth/otp/verify";
