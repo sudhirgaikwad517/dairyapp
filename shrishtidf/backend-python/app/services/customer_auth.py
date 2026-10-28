@@ -263,9 +263,13 @@ def orders_for_customer(db: Session, phone: str) -> list[dict]:
 
 def login_with_password(db: Session, phone_or_email: str, password: str, session_id: str) -> dict:
     phone_or_email = phone_or_email.strip()
-    is_phone = bool(re.fullmatch(r"\d+", phone_or_email))
+    # A phone typed or autofilled as "+91 98765 43210" is still a phone; match its last
+    # 10 digits so a number saved with or without the 91 prefix both log in.
+    is_phone = "@" not in phone_or_email and len(normalize_phone(phone_or_email)) >= 10
     if is_phone:
-        customer = db.scalar(_customer_query().where(m.customers.phone == normalize_phone(phone_or_email)).limit(1))
+        last10 = normalize_phone(phone_or_email)[-10:]
+        stored = func.right(func.regexp_replace(m.customers.phone, r"\D", "", "g"), 10)
+        customer = db.scalar(_customer_query().where(stored == last10).order_by(m.customers.password.is_(None), m.customers.created_at).limit(1))
     else:
         customer = db.scalar(
             _customer_query().where(func.lower(m.customers.email) == phone_or_email.lower()).limit(1)
