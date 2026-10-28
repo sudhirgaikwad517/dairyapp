@@ -1,6 +1,8 @@
 import 'package:dairy_app/framework/dependency_injection/inject.dart';
 import 'package:dairy_app/framework/repository/app_assets/app_assets_cache.dart';
+import 'package:dairy_app/ui/base/base_screen.dart';
 import 'package:dairy_app/ui/otp/otp_verification_screen.dart';
+import 'package:dairy_app/ui/registration/registration_screen.dart';
 import 'package:dairy_app/ui/login/signup_screen.dart';
 import 'package:dairy_app/ui/utils/app_constants/app_constants.dart';
 import 'package:dairy_app/ui/utils/theme/app_colors.dart';
@@ -216,7 +218,17 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                                 return;
                               }
                               final success = await ref.read(authNotifierProvider.notifier).loginWithPassword(_phoneController.text, _passwordController.text);
-                              if (!success && mounted) {
+                              if (success && mounted) {
+                                // Logged in: open the app (or the profile form for a new customer), as after OTP
+                                final isNewUser = ref.read(authNotifierProvider).isNewUser;
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => isNewUser ? const RegistrationScreen() : const BaseScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              } else if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(ref.read(authNotifierProvider).error ?? "Failed to login"),
