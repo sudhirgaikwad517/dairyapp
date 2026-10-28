@@ -28,7 +28,8 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
   final GlobalKey _loginButtonKey = GlobalKey();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isPasswordLogin = false;
+  // Customers log in with mobile number and password; OTP login is not offered
+  final bool _isPasswordLogin = true;
   bool _obscurePassword = true;
 
   @override
@@ -266,21 +267,6 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                         );
                       }),
                       
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _isPasswordLogin = !_isPasswordLogin;
-                          });
-                        },
-                        child: Text(
-                          _isPasswordLogin ? "Login with OTP instead" : "Login with Password",
-                          style: TextStyles.semiBold.copyWith(
-                            color: AppColors.clr6156F1,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
