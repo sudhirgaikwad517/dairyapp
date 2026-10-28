@@ -27,10 +27,10 @@ Create the default admin with `python -m scripts.seed_admin`.
 
 ## Docker
 
-- Website + delivery app: `../docker-compose.yml` builds this folder as the
-  `backend` service (port 5555, behind the gateway nginx).
-- ERP (`erp.shrishtidairyfarm.com/api`, port 3050): the `shrishti-backend-python`
-  container — see the run command in `../infra/docker-compose.yml`.
+- `../docker-compose.yml` builds this folder as the `backend` service, the one backend for
+  everything: the website, browser app and delivery app reach it through the gateway nginx, and the
+  phone app, admin panel and ERP through `erp.shrishtidairyfarm.com/api` (port 3050).
+  Its settings come from `.env` here (DATABASE_URL, JWT_SECRET, Razorpay keys).
 
 ## Layout
 

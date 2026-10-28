@@ -10,13 +10,16 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
+    # The one FastAPI backend for everything: the website and browser app (through the gateway below),
+    # and the phone app, admin panel and ERP at erp.shrishtidairyfarm.com/api (the server's nginx -> port 3050).
     build:
-      # FastAPI backend.
       context: ./backend-python
     restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://postgres:Root@123@backend-node-db-1:5432/shrishti_dairy?schema=public
-      JWT_SECRET: supersecret_shrishti
+    # DATABASE_URL, JWT_SECRET and the Razorpay keys live in backend-python/.env on the server (not in git)
+    env_file:
+      - ./backend-python/.env
+    ports:
+      - "3050:5555"
     volumes:
       # Uploaded files survive a rebuild of the backend container
       - uploads:/app/uploads
