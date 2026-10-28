@@ -55,56 +55,74 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
         body: SingleChildScrollView(
           child: Column(
             children: [
-              /// Top Image Section
-              RemoteOrAssetImage(
-                remoteUrl: getIt<AppAssetsCache>().loginImageUrl,
-                assetPath: Assets.images.loginPageBackground.path,
-                height: size.height * 0.52,
-                width: double.infinity,
-                fit: BoxFit.cover,
+              /// Top Image Section, with the form's rounded top and the logo laid over its bottom edge.
+              /// Real layout (no Transform offsets), so no empty gap is left under the logo and the
+              /// image leaves room for the whole form on a phone screen.
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  RemoteOrAssetImage(
+                    remoteUrl: getIt<AppAssetsCache>().loginImageUrl,
+                    assetPath: Assets.images.loginPageBackground.path,
+                    height: (size.height * 0.34).clamp(190.0, 320.0),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: -1,
+                    child: Container(
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: AppColors.clrWhiteFFFFFF,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(35),
+                          topRight: Radius.circular(35),
+                        ),
+                      ),
+                    ),
+                  ),
+                  /// Logo/Icon Container, centred on the form's top edge
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: CommonContainer(
+                        height: 70,
+                        width: 70,
+                        borderRadius: BorderRadius.circular(35),
+                        gradient: const LinearGradient(
+                          colors: [
+                            AppColors.clr6156F1,
+                            AppColors.clr6B60FE,
+                          ],
+                        ),
+                        blurRadius: 12,
+                        shadowColor: AppColors.clrBlack000000.withValues(alpha: 0.12),
+                        alignment: Alignment.center,
+                        child:  CommonAssetImage(
+                          path: Assets.images.loginPageLogo.path,
+
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               /// Login Form Section
-              Transform.translate(
-                offset: Offset(0, -30),
-                child: CommonContainer(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppConstants.largePadding,
-                    vertical: AppConstants.largePadding,
-                  ),
-                  color: AppColors.clrWhiteFFFFFF,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(35),
-                    topRight: Radius.circular(35),
-                  ),
-                  alignment: Alignment.topCenter,
-                  child: Column(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppConstants.largePadding,
+                  20,
+                  AppConstants.largePadding,
+                  AppConstants.largePadding,
+                ),
+                child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      /// Logo/Icon Container
-                      Transform.translate(
-                        offset: Offset(0, -50),
-                        child: CommonContainer(
-                          height: 70,
-                          width: 70,
-                          borderRadius: BorderRadius.circular(35),
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.clr6156F1,
-                              AppColors.clr6B60FE,
-                            ],
-                          ),
-                          blurRadius: 12,
-                          shadowColor: AppColors.clrBlack000000.withValues(alpha: 0.12),
-                          alignment: Alignment.center,
-                          child:  CommonAssetImage(
-                            path: Assets.images.loginPageLogo.path,
-
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
                       /// Title
                       CommonText(
                         data: "Login with Mobile Number",
@@ -127,7 +145,7 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
                           fontSize: 16,
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 28),
 
                       /// Mobile Number Input
                       CommonTextFormField(
@@ -308,7 +326,6 @@ class _LoginScreenConsumerState extends ConsumerState<LoginScreen> {
 
                     ],
                   ),
-                ),
               ),
             ],
           ),
