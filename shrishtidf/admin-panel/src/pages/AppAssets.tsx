@@ -11,7 +11,7 @@ const SLOTS: { slot: Slot; title: string; description: string; aspect: string }[
   {
     slot: 'splash',
     title: 'Splash Screen Image',
-    description: 'Shown full-screen for a moment when the app first opens.',
+    description: 'Shown inside the milk circle when the app opens. Use a square logo with a transparent background.',
     aspect: 'aspect-square max-w-[220px]'
   },
   {
@@ -68,7 +68,7 @@ function AssetCard({ slot, title, description, aspect, url, onUploaded }: {
 
         <div className={`${aspect} w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 overflow-hidden flex items-center justify-center`}>
           {url ? (
-            <img src={url} alt={title} className="w-full h-full object-cover" />
+            <img src={url} alt={title} className={`w-full h-full ${slot === 'splash' ? 'object-contain' : 'object-cover'}`} />
           ) : (
             <div className="flex flex-col items-center text-gray-400 gap-2 p-6">
               <ImageIcon size={28} />

@@ -33,8 +33,29 @@
 
   <title>Shrishti Dairy Farm</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* The splash screen's empty milk circle, shown while the app downloads */
+    html, body { margin: 0; background: #f3f7fc; }
+    #app-loader {
+      position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center;
+      background: linear-gradient(165deg, #fffbf7 0%, #f3f7fc 55%, #e8f0fa 100%);
+    }
+    #app-loader div {
+      width: 152px; height: 152px; box-sizing: border-box; border-radius: 50%;
+      border: 3px solid #1a3d72; background: #fff; display: grid; place-items: center;
+      box-shadow: 0 0 0 6px rgb(26 61 114 / 12%), 0 18px 40px rgb(26 61 114 / 22%);
+    }
+    #app-loader img { width: 72%; height: 72%; object-fit: contain; }
+  </style>
 </head>
 <body>
+  <div id="app-loader"><div><img src="icons/splash-logo.png" alt=""></div></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loader = document.getElementById('app-loader');
+      if (loader) loader.remove();
+    });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
