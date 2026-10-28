@@ -3,6 +3,8 @@
 FROM nginx:alpine
 
 COPY html /usr/share/nginx/html
+# CanvasKit comes from Google's CDN: drop a local copy if one was left behind
+RUN rm -rf /usr/share/nginx/html/canvaskit /usr/share/nginx/html/.gitignore
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
