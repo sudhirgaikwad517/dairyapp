@@ -13,12 +13,13 @@ from .activity_log import log_activity
 from .cart import get_cart_by_session
 
 
-def _settings(db: Session) -> dict:
+def checkout_settings(db: Session) -> dict:
     min_order = db.get(m.site_settings, "min_order_value")
     free_delivery = db.get(m.site_settings, "free_delivery_threshold")
     wallet_enabled = db.get(m.site_settings, "wallet_enabled")
     return {
-        "minOrderValue": js_number(min_order.value) if min_order else 20000,
+        # No minimum unless one is set (per delivery zone in the admin panel, or the min_order_value setting)
+        "minOrderValue": js_number(min_order.value) if min_order else 0,
         "freeDeliveryThreshold": js_number(free_delivery.value) if free_delivery else 50000,
         "walletEnabled": truthy(wallet_enabled.value) if wallet_enabled else True,
     }
@@ -36,7 +37,7 @@ def get_active_slots(db: Session) -> list[dict]:
 
 def validate_pincode(db: Session, pincode: str) -> dict:
     pincode = re.sub(r"\D+", "", pincode or "")
-    settings = _settings(db)
+    settings = checkout_settings(db)
 
     if len(pincode) != 6:
         return {
@@ -78,7 +79,7 @@ def validate_pincode(db: Session, pincode: str) -> dict:
 def quote(db: Session, session_id: str, pincode: str) -> dict:
     cart = get_cart_by_session(db, session_id)
     zone = validate_pincode(db, pincode)
-    settings = _settings(db)
+    settings = checkout_settings(db)
     lines = _build_line_totals(db, cart["items"])
 
     # `subtotal` is the pre-tax base — it, `taxAmount` and `deliveryFee` add
@@ -125,7 +126,7 @@ def place_order(db: Session, session_id: str, body: dict, customer) -> dict:
     if items_total < zone["minOrderValue"]:
         raise ServiceError("BELOW_MINIMUM_ORDER")
 
-    settings = _settings(db)
+    settings = checkout_settings(db)
     delivery_fee = zone["deliveryFee"] if items_total < settings["freeDeliveryThreshold"] else 0
 
     payment_method = body.get("paymentMethod") or "cod"

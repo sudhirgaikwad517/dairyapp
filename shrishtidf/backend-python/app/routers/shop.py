@@ -109,8 +109,7 @@ def cart_destroy(request: Request, db: DB):
 @router.get("/checkout/options")
 @guard()
 def checkout_options(db: DB):
-    settings = {"minOrderValue": 20000, "freeDeliveryThreshold": 50000, "walletEnabled": True}
-    return ok({"settings": settings, "deliverySlots": checkout_service.get_active_slots(db)})
+    return ok({"settings": checkout_service.checkout_settings(db), "deliverySlots": checkout_service.get_active_slots(db)})
 
 
 @router.post("/checkout/validate-pincode")
