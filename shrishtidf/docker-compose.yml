@@ -17,6 +17,9 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:Root@123@backend-node-db-1:5432/shrishti_dairy?schema=public
       JWT_SECRET: supersecret_shrishti
+    volumes:
+      # Uploaded files survive a rebuild of the backend container
+      - uploads:/app/uploads
     networks:
       - default
       - old_backend
@@ -73,3 +76,4 @@ networks:
 
 volumes:
   postgres_data:
+  uploads:

@@ -8,6 +8,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      workbox: {
+        // These paths are other apps behind the same domain: never answer them with the website's index.html
+        navigateFallbackDenylist: [/^\/app(\/|$)/, /^\/api\//, /^\/uploads\//, /^\/admin(\/|$)/],
+      },
       manifest: {
         name: "Shrishti A2 Milk",
         short_name: "Shrishti A2",
